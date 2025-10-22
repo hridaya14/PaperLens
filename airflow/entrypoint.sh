@@ -22,8 +22,8 @@ airflow users create \
     --firstname Admin \
     --lastname User \
     --role Admin \
-    --email admin@example.com \
-    --password admin || echo "Admin user already exists"
+    --email $AIRFLOW__EMAIL \
+    --password $AIRFLOW__PASSWORD || echo "Admin user already exists"
 
 # Start webserver and scheduler
 echo "Starting Airflow webserver and scheduler..."

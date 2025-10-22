@@ -4,7 +4,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 from src.dependencies import OpenSearchDep
-from src.schemas.api.search import SearchHit, SearchRequest, SearchResponse
+from src.schemas import SearchHit, SearchRequest, SearchResponse
 
 logger = logging.getLogger(__name__)
 
@@ -23,10 +23,12 @@ async def search_papers(request: SearchRequest, opensearch_client: OpenSearchDep
     try:
         # Check if OpenSearch is healthy
         if not opensearch_client.health_check():
-            raise HTTPException(status_code=503, detail="Search service is currently unavailable")
+            raise HTTPException(
+                status_code=503, detail="Search service is currently unavailable")
 
         # Perform search with filters
-        logger.info(f"Searching for: {request.query} (latest_papers: {request.latest_papers})")
+        logger.info(f"Searching for:"
+                    f"{request.query} (latest_papers: {request.latest_papers})")
         results = opensearch_client.search_papers(
             query=request.query,
             size=request.size,

@@ -7,15 +7,8 @@ from .parser import PDFParserService
 
 @lru_cache(maxsize=1)
 def make_pdf_parser_service() -> PDFParserService:
-    """
-    Factory function to create a PDF parser service using Docling.
-    Uses @lru_cache for automatic memoization to avoid reloading PyTorch models.
+    """Create cached PDF parser service using Docling."""
 
-    Configuration is loaded from centralized settings (src/config.py).
-
-    Returns:
-        PDFParserService: A cached instance of the PDF parser service.
-    """
     # Get settings from centralized config
     settings = get_settings()
 

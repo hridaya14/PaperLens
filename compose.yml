@@ -81,6 +81,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    env_file:
+      - .env
     environment:
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=${POSTGRES_DATABASE_URL}
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
