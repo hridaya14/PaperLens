@@ -71,6 +71,20 @@ class PDFParserSettings(BaseConfigSettings):
     do_ocr: bool = False
     do_table_structure: bool = True
 
+class ChunkingSettings(BaseConfigSettings):
+    model_config = SettingsConfigDict(
+        env_file=[".env", str(ENV_FILE_PATH)],
+        env_prefix="CHUNKING__",
+        extra="ignore",
+        frozen=True,
+        case_sensitive=False,
+    )
+
+    chunk_size: int = 600  # Target words per chunk
+    overlap_size: int = 100  # Words to overlap between chunks
+    min_chunk_size: int = 100  # Minimum words for a valid chunk
+    section_based: bool = True  # Use section-based chunking when available
+
 
 class OpenSearchSettings(BaseConfigSettings):
     model_config = SettingsConfigDict(
@@ -83,7 +97,14 @@ class OpenSearchSettings(BaseConfigSettings):
 
     host: str = "http://localhost:9200"
     index_name: str = "arxiv-papers"
+    chunk_index_suffix: str = "chunks"
     max_text_size: int = 1000000
+
+    vector_dimension: int = 1024  # Jina embeddings dimension
+    vector_space_type: str = "cosinesimil"  # cosinesimil, l2, innerproduct
+
+    rrf_pipeline_name: str = "hybrid-rrf-pipeline"
+    hybrid_search_size_multiplier: int = 2
 
 
 class Settings(BaseConfigSettings):
@@ -109,6 +130,9 @@ class Settings(BaseConfigSettings):
     ollama_default_model: str = "llama3.2:1b"
     ollama_timeout: int = 300  # 5 minutes for LLM operations
 
+    # Embeddings config (JinaAI)
+    jina_api_key: str = ""
+
     # arXiv settings
     arxiv: ArxivSettings = Field(default_factory=ArxivSettings)
 
@@ -117,6 +141,9 @@ class Settings(BaseConfigSettings):
 
     # Opensearch Settings
     opensearch: OpenSearchSettings = Field(default_factory=OpenSearchSettings)
+
+    # Chunking settings
+    chunking: ChunkingSettings = Field(default_factory = ChunkingSettings)
 
     @field_validator("postgres_database_url")
     @classmethod

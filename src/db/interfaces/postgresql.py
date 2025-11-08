@@ -2,31 +2,14 @@ import logging
 from contextlib import contextmanager
 from typing import Generator, Optional
 
-from pydantic import Field
-from pydantic_settings import BaseSettings
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session, sessionmaker
 from src.db.interfaces.base import BaseDatabase
+from src.schemas.database.config import PostgreSQLSettings
 
 logger = logging.getLogger(__name__)
-
-
-class PostgreSQLSettings(BaseSettings):
-    """PostgreSQL configuration settings."""
-
-    database_url: str = Field(
-        default="postgresql://rag_user:rag_password@localhost:5432/rag_db", description="PostgreSQL database URL"
-    )
-    echo_sql: bool = Field(
-        default=False, description="Enable SQL query logging")
-    pool_size: int = Field(
-        default=20, description="Database connection pool size")
-    max_overflow: int = Field(default=0, description="Maximum pool overflow")
-
-    class Config:
-        env_prefix = "POSTGRES_"
 
 
 Base = declarative_base()
@@ -45,11 +28,9 @@ class PostgreSQLDatabase(BaseDatabase):
         try:
             # Log connection attempt
             logger.info(
-                f"Attempting to connect to PostgreSQL at: {self.config.database_url.split(
-                    '@')[1] if '@' in self.config.database_url else 'localhost'}"
+                f"Attempting to connect to PostgreSQL at: {self.config.database_url.split('@')[1] if '@' in self.config.database_url else 'localhost'}"
             )
 
-            # Instantiate database engine
             self.engine = create_engine(
                 self.config.database_url,
                 echo=self.config.echo_sql,
@@ -57,9 +38,8 @@ class PostgreSQLDatabase(BaseDatabase):
                 max_overflow=self.config.max_overflow,
                 pool_pre_ping=True,  # Verify connections before use
             )
-            # Session factory for generating db sessions
-            self.session_factory = sessionmaker(
-                bind=self.engine, expire_on_commit=False)
+
+            self.session_factory = sessionmaker(bind=self.engine, expire_on_commit=False)
 
             # Test the connection
             assert self.engine is not None
@@ -86,8 +66,7 @@ class PostgreSQLDatabase(BaseDatabase):
             logger.info("PostgreSQL database initialized successfully")
             assert self.engine is not None
             logger.info(f"Database: {self.engine.url.database}")
-            logger.info(f"Total tables: {', '.join(
-                updated_tables) if updated_tables else 'None'}")
+            logger.info(f"Total tables: {', '.join(updated_tables) if updated_tables else 'None'}")
             logger.info("Database connection established")
 
         except Exception as e:
@@ -104,8 +83,7 @@ class PostgreSQLDatabase(BaseDatabase):
     def get_session(self) -> Generator[Session, None, None]:
         """Get a database session."""
         if not self.session_factory:
-            raise RuntimeError(
-                "Database not initialized. Call startup() first.")
+            raise RuntimeError("Database not initialized. Call startup() first.")
 
         session = self.session_factory()
         try:

@@ -6,9 +6,10 @@ import uvicorn
 from fastapi import FastAPI
 from src.config import get_settings
 from src.db.factory import make_database
-from src.routers import papers, ping, search
+from src.routers import hybrid_search, papers, ping
 from src.services.arxiv.factory import make_arxiv_client
 from src.services.opensearch.factory import make_opensearch_client
+from src.services.embeddings.factory import make_embeddings_service
 from src.services.pdf_parser.factory import make_pdf_parser_service
 
 # Setup logging
@@ -41,24 +42,27 @@ async def lifespan(app: FastAPI):
     if opensearch_client.health_check():
         logger.info("OpenSearch connected successfully")
 
-        # Ensure index exists
-        if opensearch_client.create_index(force=False):
-            logger.info("OpenSearch index created")
+        # Setup hybrid index (supports all search types)
+        setup_results = opensearch_client.setup_indices(force=False)
+        if setup_results.get("hybrid_index"):
+            logger.info("Hybrid index created")
         else:
-            logger.info("OpenSearch index already exists")
+            logger.info("Hybrid index already exists")
 
-        # Get index statistics
-        stats = opensearch_client.get_index_stats()
-        logger.info(f"OpenSearch ready:"
-                    f"{stats.get('document_count', 0)} documents indexed")
+        # Get simple statistics
+        try:
+            stats = opensearch_client.client.count(index=opensearch_client.index_name)
+            logger.info(f"OpenSearch ready: {stats['count']} documents indexed")
+        except Exception:
+            logger.info("OpenSearch index ready (stats unavailable)")
     else:
-        logger.warning(
-            "OpenSearch connection failed - search features will be limited")
+        logger.warning("OpenSearch connection failed - search features will be limited")
 
     # Initialize other services (kept for future endpoints and notebook demos)
     app.state.arxiv_client = make_arxiv_client()
     app.state.pdf_parser = make_pdf_parser_service()
-    logger.info("Services initialized: arXiv API client, PDF parser, OpenSearch")
+    app.state.embeddings_service = make_embeddings_service()
+    logger.info("Services initialized: arXiv API client, PDF parser, OpenSearch, Embeddings")
 
     logger.info("API ready")
     yield
@@ -78,7 +82,7 @@ app = FastAPI(
 # Include routers
 app.include_router(ping.router, prefix="/api/v1")
 app.include_router(papers.router, prefix="/api/v1")
-app.include_router(search.router, prefix="/api/v1")
+app.include_router(hybrid_search.router, prefix="/api/v1")
 
 
 if __name__ == "__main__":
