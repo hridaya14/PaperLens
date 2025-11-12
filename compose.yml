@@ -20,7 +20,6 @@ services:
       start_period: 40s
     environment:
       - OPENSEARCH_HOST=${OPENSEARCH_HOST}
-      - OLLAMA_HOST=${OLLAMA_HOST}
       - POSTGRES_DATABASE_URL=${POSTGRES_DATABASE_URL}
       - ENVIRONMENT=${ENVIRONMENT}
     networks:
@@ -110,22 +109,6 @@ services:
     networks:
       - rag-network
 
-  ollama:
-    image: ollama/ollama:0.11.2
-    container_name: rag-ollama
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    healthcheck:
-      test: ["CMD", "ollama", "list"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-    networks:
-      - rag-network
-
   postgres:
     image: postgres:16-alpine
     container_name: rag-postgres
@@ -165,7 +148,6 @@ services:
 volumes:
   postgres_data:
   opensearch_data:
-  ollama_data:
   airflow_logs:
 
 networks:

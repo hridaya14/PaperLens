@@ -4,7 +4,7 @@ from fastapi import APIRouter
 from ..dependencies import DatabaseDep, SettingsDep, OpenSearchDep
 from ..exceptions import OllamaConnectionError, OllamaException, OllamaTimeoutError
 from ..schemas.api.health import HealthResponse, ServiceStatus
-from ..services.ollama import OllamaClient
+from ..services.nvidia import NvidiaClient
 
 router = APIRouter()
 
@@ -61,16 +61,16 @@ async def health_check(settings: SettingsDep, database: DatabaseDep, opensearch_
     _check_service("database", _check_database)
     _check_service("opensearch", _check_opensearch)
 
-    # Handle Ollama async check separately
+    # Handle Nvidia async check separately
     try:
-        ollama_client = OllamaClient(settings)
-        ollama_health = await ollama_client.health_check()
-        services["ollama"] = ServiceStatus(
-            status=ollama_health["status"], message=ollama_health["message"])
-        if ollama_health["status"] != "healthy":
+        nvidia_client = NvidiaClient()
+        nvidia_health = nvidia_client.health_check()
+        services["nvidia"] = ServiceStatus(
+            status=nvidia_health["status"], message=nvidia_health["message"])
+        if nvidia_health["status"] != "healthy":
             overall_status = "degraded"
     except Exception as e:
-        services["ollama"] = ServiceStatus(status="unhealthy", message=str(e))
+        services["nvidia"] = ServiceStatus(status="unhealthy", message=str(e))
         overall_status = "degraded"
 
     return HealthResponse(

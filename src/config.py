@@ -71,6 +71,7 @@ class PDFParserSettings(BaseConfigSettings):
     do_ocr: bool = False
     do_table_structure: bool = True
 
+
 class ChunkingSettings(BaseConfigSettings):
     model_config = SettingsConfigDict(
         env_file=[".env", str(ENV_FILE_PATH)],
@@ -124,11 +125,10 @@ class Settings(BaseConfigSettings):
     # OpenSearch configuration
     opensearch_host: str = "http://localhost:9200"
 
-    # Ollama configuration
-    ollama_host: str = "http://localhost:11434"
-    ollama_models: List[str] = Field(default=["llama3.2:1b"])
-    ollama_default_model: str = "llama3.2:1b"
-    ollama_timeout: int = 300  # 5 minutes for LLM operations
+    # Nvidia configuration
+    nvidia_api_key: str = ""
+    nvidia_base_url: str = ""
+    nvidia_timeout: int = 300
 
     # Embeddings config (JinaAI)
     jina_api_key: str = ""
@@ -143,7 +143,7 @@ class Settings(BaseConfigSettings):
     opensearch: OpenSearchSettings = Field(default_factory=OpenSearchSettings)
 
     # Chunking settings
-    chunking: ChunkingSettings = Field(default_factory = ChunkingSettings)
+    chunking: ChunkingSettings = Field(default_factory=ChunkingSettings)
 
     @field_validator("postgres_database_url")
     @classmethod
