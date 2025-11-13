@@ -401,23 +401,38 @@ class ArxivClient:
 
     def _get_pdf_url(self, entry: ET.Element) -> str:
         """
-        Extract PDF URL from entry links.
-
-        Args:
-            entry: XML entry element
-
-        Returns:
-            PDF URL or empty string (always HTTPS)
+        Extract PDF URL from entry links, compatible with new arXiv behavior.
         """
+
+        pdf_url = ""
+
+        # 1. Try official <link type="application/pdf"> (old behavior)
         for link in entry.findall("atom:link", self.namespaces):
             if link.get("type") == "application/pdf":
-                url = link.get("href", "")
-                # Convert HTTP to HTTPS for arXiv URLs
-                if url.startswith("http://arxiv.org/"):
-                    url = url.replace("http://arxiv.org/",
-                                      "https://arxiv.org/")
-                return url
-        return ""
+                pdf_url = link.get("href", "")
+                break
+
+        # 2. Fallback: any /pdf/ link (current behavior)
+        if not pdf_url:
+            for link in entry.findall("atom:link", self.namespaces):
+                href = link.get("href", "")
+                if "/pdf/" in href:
+                    pdf_url = href
+                    break
+
+        # 3. If still missing, generate manually
+        if not pdf_url:
+            arxiv_id_elem = entry.find("atom:id", self.namespaces)
+            if arxiv_id_elem is not None and arxiv_id_elem.text:
+                arxiv_id = arxiv_id_elem.text.split("/")[-1]
+                pdf_url = f"https://arxiv.org/pdf/{arxiv_id}"
+
+        # 4. Normalize http → https
+        if pdf_url.startswith("http://arxiv.org/"):
+            pdf_url = pdf_url.replace(
+                "http://arxiv.org/", "https://arxiv.org/")
+
+        return pdf_url
 
     async def download_pdf(self, paper: ArxivPaper, force_download: bool = False) -> Optional[Path]:
         """
