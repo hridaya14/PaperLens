@@ -28,15 +28,12 @@ class PDFParserService:
         )
 
     async def parse_pdf(self, pdf_path: Path) -> Optional[PdfContent]:
-        """
-        Parse PDF using Docling parser only.
+        """Parse PDF using Docling parser only.
 
-        Args:
-            pdf_path: Path to PDF file
-
-        Returns:
-            PdfContent object or None if parsing failed
+        :param pdf_path: Path to PDF file
+        :returns: PdfContent object or None if parsing failed
         """
+
         if not pdf_path.exists():
             logger.error(f"PDF file not found: {pdf_path}")
             raise PDFValidationError(f"PDF file not found: {pdf_path}")

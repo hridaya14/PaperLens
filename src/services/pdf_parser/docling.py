@@ -13,17 +13,15 @@ logger = logging.getLogger(__name__)
 
 
 class DoclingParser:
-    """Docling PDF parser for fallback when GROBID fails."""
+    """Docling PDF parser for scientific document processing."""
 
-    def __init__(self, max_pages: int = 20, max_file_size_mb: int = 20, do_ocr: bool = False, do_table_structure: bool = True):
-        """
-        Initialize DocumentConverter with optimized pipeline options.
+    def __init__(self, max_pages: int, max_file_size_mb: int, do_ocr: bool = False, do_table_structure: bool = True):
+        """Initialize DocumentConverter with optimized pipeline options.
 
-        Args:
-            max_pages: Maximum number of pages to process (default: 20)
-            max_file_size_mb: Maximum file size in MB (default: 20MB)
-            do_ocr: Enable OCR for scanned PDFs (default: False, very slow)
-            do_table_structure: Extract table structures (default: True)
+        :param max_pages: Maximum number of pages to process
+        :param max_file_size_mb: Maximum file size in MB
+        :param do_ocr: Enable OCR for scanned PDFs (default: False, very slow)
+        :param do_table_structure: Extract table structures (default: True)
         """
         # Configure pipeline options
         pipeline_options = PdfPipelineOptions(
@@ -44,14 +42,10 @@ class DoclingParser:
             self._warmed_up = True
 
     def _validate_pdf(self, pdf_path: Path) -> bool:
-        """
-        Comprehensive PDF validation including size and page limits.
+        """Comprehensive PDF validation including size and page limits.
 
-        Args:
-            pdf_path: Path to PDF file
-
-        Returns:
-            True if PDF appears valid and within limits, False otherwise
+        :param pdf_path: Path to PDF file
+        :returns: True if PDF appears valid and within limits, False otherwise
         """
         try:
             # Check file exists and is not empty
@@ -67,8 +61,8 @@ class DoclingParser:
                         self.max_file_size_bytes / 1024 / 1024:.1f}MB), skipping processing"
                 )
                 raise PDFValidationError(
-                    f"PDF file too large: {
-                        file_size / 1024 / 1024:.1f}MB > {self.max_file_size_bytes / 1024 / 1024:.1f}MB"
+                    f"PDF file too large: {file_size / 1024 / 1024:.1f}MB >"
+                    f"{self.max_file_size_bytes / 1024 / 1024:.1f}MB"
                 )
 
             # Check if file starts with PDF header
@@ -86,11 +80,11 @@ class DoclingParser:
 
             if actual_pages > self.max_pages:
                 logger.warning(
-                    f"PDF has {actual_pages} pages, exceeding limit of {
-                        self.max_pages} pages. Skipping processing to avoid performance issues."
+                    f"PDF has {actual_pages} pages, exceeding limit of"
+                    f"{self.max_pages} pages. Skipping processing to avoid performance issues."
                 )
-                raise PDFValidationError(f"PDF has too many pages: {
-                                         actual_pages} > {self.max_pages}")
+                raise PDFValidationError(f"PDF has too many pages: "
+                                         f"{actual_pages} > {self.max_pages}")
 
             return True
 
@@ -101,15 +95,11 @@ class DoclingParser:
             raise PDFValidationError(f"Error validating PDF {pdf_path}: {e}")
 
     async def parse_pdf(self, pdf_path: Path) -> Optional[PdfContent]:
-        """
-        Parse PDF using Docling as fallback parser.
+        """Parse PDF using Docling parser.
         Limited to 20 pages to avoid memory issues with large papers.
 
-        Args:
-            pdf_path: Path to PDF file
-
-        Returns:
-            PdfContent object or None if parsing failed
+        :param pdf_path: Path to PDF file
+        :returns: PdfContent object or None if parsing failed
         """
         try:
             # Validate PDF first (includes size and page limits)
@@ -197,11 +187,11 @@ class DoclingParser:
                 raise PDFParsingException(
                     f"Out of memory processing PDF: {pdf_path}")
             elif "max_num_pages" in error_msg or "page" in error_msg:
-                logger.error(f"PDF processing issue likely related to page limits (current limit: {
-                             self.max_pages} pages)")
+                logger.error(f"PDF processing issue likely related to page limits (current limit:"
+                             f"{self.max_pages} pages)")
                 raise PDFParsingException(
-                    f"PDF processing failed, possibly due to page limit ({
-                        self.max_pages} pages). Error: {e}"
+                    f"PDF processing failed, possibly due to page limit"
+                    f"({self.max_pages} pages). Error: {e}"
                 )
             else:
                 raise PDFParsingException(
