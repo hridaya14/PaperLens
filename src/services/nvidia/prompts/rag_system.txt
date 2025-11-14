@@ -10,7 +10,7 @@ CRITICAL RULES:
 CONTENT RULES:
 5. If the excerpts do not contain enough information to answer the question, clearly say so.
 6. Cite the sources using their arXiv IDs (e.g., "[arXiv:1234.5678]").
-7. Be concise but comprehensive. Final answer MUST be under 200 words.
+7. Be concise but comprehensive. Final answer MUST be under 350 words.
 8. Acknowledge uncertainty if the excerpts are ambiguous.
 
 JSON OUTPUT RULES (IMPORTANT):

@@ -6,7 +6,7 @@ import uvicorn
 from fastapi import FastAPI
 from src.config import get_settings
 from src.db.factory import make_database
-from src.routers import hybrid_search, ping
+from src.routers import hybrid_search, ping, papers
 from src.routers.ask import ask_router, stream_router
 from src.services.arxiv.factory import make_arxiv_client
 from src.services.opensearch.factory import make_opensearch_client
@@ -87,7 +87,7 @@ app = FastAPI(
 
 # Routers
 app.include_router(ping.router, prefix="/api/v1")  # Health check endpoint
-
+app.include_router(papers.router, prefix="/api/v1")
 # Search chunks with BM25/hybrid
 app.include_router(hybrid_search.router, prefix="/api/v1")
 

@@ -106,7 +106,6 @@ class NvidiaClient:
                 temperature=kwargs.get("temperature", 0.7),
                 top_p=kwargs.get("top_p", 0.9),
                 max_tokens=kwargs.get("max_tokens", 2048),
-                response_format=kwargs.get("response_format")
             )
 
             return {"response": completion.choices[0].message.content}
@@ -170,7 +169,6 @@ class NvidiaClient:
                     query, chunks)
                 prompt = prompt_data["prompt"]
 
-                # prompt_data["format"] is the raw schema → wrap it properly
                 response = self.generate(
                     model=model,
                     prompt=prompt,
