@@ -7,7 +7,7 @@ from openai import OpenAI, APIConnectionError, APITimeoutError, OpenAIError
 from src.config import get_settings
 from src.exceptions import OllamaConnectionError, OllamaException, OllamaTimeoutError
 from src.schemas.nvidia import RAGResponse
-from src.services.nvidia.prompts import RAGPromptBuilder, ResponseParser
+from src.services.nvidia.prompts import RAGPromptBuilder, ResponseParser, response_format
 import traceback
 
 logger = logging.getLogger(__name__)
@@ -106,7 +106,7 @@ class NvidiaClient:
                 temperature=kwargs.get("temperature", 0.7),
                 top_p=kwargs.get("top_p", 0.9),
                 max_tokens=kwargs.get("max_tokens", 2048),
-                response_format=kwargs.get("response_format"),
+                response_format=kwargs.get("response_format")
             )
 
             return {"response": completion.choices[0].message.content}
@@ -176,10 +176,7 @@ class NvidiaClient:
                     prompt=prompt,
                     temperature=0.7,
                     top_p=0.9,
-                    response_format={
-                        "type": "json_schema",
-                        "json_schema": prompt_data["format"],
-                    },
+                    response_format=response_format,
                 )
             else:
                 prompt = self.prompt_builder.create_rag_prompt(query, chunks)
@@ -205,7 +202,7 @@ class NvidiaClient:
                         if arxiv_id:
                             clean_id = arxiv_id.split(
                                 "v")[0] if "v" in arxiv_id else arxiv_id
-                            pdf_url = f"https://arxiv.org/pdf/{clean_id}.pdf"
+                            pdf_url = f"https://arxiv.org/pdf/{clean_id}"
                             if pdf_url not in seen:
                                 sources.append(pdf_url)
                                 seen.add(pdf_url)

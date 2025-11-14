@@ -120,7 +120,8 @@ async def ask_question(
                     request.model}")
 
         # Generate answer using LLM
-        rag_response = await nvidia_client.generate_rag_answer(query=request.query, chunks=chunks, model=request.model)
+        rag_response = nvidia_client.generate_rag_answer(
+            query=request.query, chunks=chunks, model=request.model)
 
         logger.debug(f"RAG response: {rag_response}")
 

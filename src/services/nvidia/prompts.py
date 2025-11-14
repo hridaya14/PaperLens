@@ -6,6 +6,40 @@ from typing import Any, Dict, List
 from pydantic import ValidationError
 from src.schemas.nvidia import RAGResponse
 
+response_format = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "rag_response",
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "properties": {
+                "answer": {
+                    "type": "string",
+                    "description": "Comprehensive answer based on the provided paper excerpts"
+                },
+                "sources": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of PDF URLs from papers used in the answer"
+                },
+                "confidence": {
+                    "type": ["string", "null"],
+                    "enum": ["high", "medium", "low", None],
+                    "description": "Confidence level"
+                },
+                "citations": {
+                    "type": ["array", "null"],
+                    "items": {"type": "string"},
+                    "description": "Specific arXiv IDs referenced in the answer"
+                },
+            },
+            "required": ["answer"],
+            "additionalProperties": False
+        }
+    }
+}
+
 
 class RAGPromptBuilder:
     """Builder class for creating RAG prompts."""
@@ -42,16 +76,17 @@ class RAGPromptBuilder:
             Formatted prompt string
         """
         prompt = f"{self.system_prompt}\n\n"
-        prompt += "### Context from Papers:\n\n"
+        prompt += "### Context from Papers (do NOT imitate formatting):\n\n"
 
         for i, chunk in enumerate(chunks, 1):
             # Get the actual chunk text
             chunk_text = chunk.get("chunk_text", chunk.get("content", ""))
             arxiv_id = chunk.get("arxiv_id", "")
 
-            # Only include minimal metadata - just arxiv_id for citation
-            prompt += f"[{i}. arXiv:{arxiv_id}]\n"
-            prompt += f"{chunk_text}\n\n"
+            prompt += f"[Source {i} — arXiv:{arxiv_id}]\n"
+            prompt += "```text\n"
+            prompt += f"{chunk_text}\n"
+            prompt += "```\n\n"
 
         prompt += f"### Question:\n{query}\n\n"
         prompt += "### Answer (cite sources using [arXiv:id] format):\n"

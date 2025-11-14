@@ -23,8 +23,8 @@ class AskRequest(BaseModel):
                 "query": "What are transformers in machine learning?",
                 "top_k": 3,
                 "use_hybrid": True,
-                "model": "llama3.2:1b",
-                "categories": ["cs.AI", "cs.LG"],
+                "model": "meta/llama-3.3-70b-instruct",
+                "categories": ["cs.AI"],
             }
         }
 
