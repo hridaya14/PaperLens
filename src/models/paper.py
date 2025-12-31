@@ -4,10 +4,22 @@ from datetime import datetime, timezone
 from sqlalchemy import JSON, Boolean, Column, DateTime, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from src.db.interfaces.postgresql import Base
+from sqlalchemy.dialects.postgresql import TSVECTOR
+from sqlalchemy import Index
 
 
 class Paper(Base):
     __tablename__ = "papers"
+
+    search_vector = Column(TSVECTOR)
+
+    __table_args__ = (
+        Index(
+            "ix_papers_search_vector",
+            "search_vector",
+            postgresql_using="gin",
+        ),
+    )
 
     # Core arXiv metadata
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

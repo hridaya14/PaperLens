@@ -31,6 +31,8 @@ class PostgreSQLDatabase(BaseDatabase):
                 f"Attempting to connect to PostgreSQL at: {self.config.database_url.split('@')[1] if '@' in self.config.database_url else 'localhost'}"
             )
 
+            import src.models
+
             self.engine = create_engine(
                 self.config.database_url,
                 echo=self.config.echo_sql,

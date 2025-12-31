@@ -20,7 +20,8 @@ dependencies = [
     "sentence-transformers>=5.1.0",
     "gradio>=4.0.0",
     "mcp>=1.13.1",
-    "openai"
+    "openai",
+    "alembic>=1.13.3"
 ]
 
 [dependency-groups]

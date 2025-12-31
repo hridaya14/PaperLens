@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from sqlalchemy.orm import Session
 from src.dependencies import SessionDep
 from src.repositories.paper import PaperRepository
-from src.schemas.arxiv.paper import PaperResponse, PaperSearchResponse
+from src.schemas.arxiv.paper import PaperResponse, PaperSearchFilters, PaperSearchResponse
 
 router = APIRouter(prefix="/papers", tags=["papers"])
 
@@ -23,6 +23,36 @@ def list_papers(
     total = paper_repo.get_count()
 
     return PaperSearchResponse(papers=[PaperResponse.model_validate(paper) for paper in papers], total=total)
+
+@router.get("/search")
+def search_papers(
+    db: SessionDep,
+    q: Optional[str] = None,
+    categories: Optional[List[str]] = Query(None),
+    pdf_processed: Optional[bool] = None,
+    published_after: Optional[datetime] = None,
+    published_before: Optional[datetime] = None,
+    limit: int = 20,
+    offset: int = 0,
+):
+    filters = PaperSearchFilters(
+        query=q,
+        categories=categories,
+        pdf_processed=pdf_processed,
+        published_after=published_after,
+        published_before=published_before,
+    )
+
+    repo = PaperRepository(session)
+    papers, total = repo.search(filters, limit, offset)
+
+    return {
+        "items": papers,
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
+
 
 
 @router.get("/{arxiv_id}", response_model=PaperResponse)

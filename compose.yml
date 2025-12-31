@@ -143,7 +143,22 @@ services:
     networks:
       - rag-network
 
-
+  frontend:
+  build:
+    context: ./frontend
+    dockerfile: Dockerfile
+  container_name: rag-frontend
+  ports:
+    - "8501:8501"
+  env_file:
+    - .env
+  environment:
+    - API_BASE_URL=http://localhost:8000/api/v1
+  depends_on:
+    api:
+      condition: service_healthy
+  networks:
+    - rag-network
 
 volumes:
   postgres_data:
