@@ -49,26 +49,9 @@ class PostgreSQLDatabase(BaseDatabase):
                 conn.execute(text("SELECT 1"))
                 logger.info("Database connection test successful")
 
-            # Check which tables exist before creating
-            inspector = inspect(self.engine)
-            existing_tables = inspector.get_table_names()
-
-            # Create tables if they don't exist (idempotent operation)
-            Base.metadata.create_all(bind=self.engine)
-
-            # Check if any new tables were created
-            updated_tables = inspector.get_table_names()
-            new_tables = set(updated_tables) - set(existing_tables)
-
-            if new_tables:
-                logger.info(f"Created new tables: {', '.join(new_tables)}")
-            else:
-                logger.info("All tables already exist - no new tables created")
-
             logger.info("PostgreSQL database initialized successfully")
             assert self.engine is not None
             logger.info(f"Database: {self.engine.url.database}")
-            logger.info(f"Total tables: {', '.join(updated_tables) if updated_tables else 'None'}")
             logger.info("Database connection established")
 
         except Exception as e:

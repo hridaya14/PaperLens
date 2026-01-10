@@ -1,6 +1,17 @@
+"""
+Add full text search support to papers
+"""
+
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
+
+# --- Alembic identifiers ---
+revision = "0002_add_paper_fts"
+down_revision = "0001_initial_schema"
+branch_labels = None
+depends_on = None
+
 
 
 def upgrade():
@@ -35,18 +46,6 @@ def upgrade():
         "papers",
         ["search_vector"],
         postgresql_using="gin",
-    )
-
-    op.create_index(
-        "ix_papers_published_date",
-        "papers",
-        ["published_date"],
-    )
-
-    op.create_index(
-        "ix_papers_pdf_processed",
-        "papers",
-        ["pdf_processed"],
     )
 
     op.create_index(

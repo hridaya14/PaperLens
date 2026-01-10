@@ -1,3 +1,5 @@
+from datetime import datetime
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from sqlalchemy.orm import Session
 from src.dependencies import SessionDep
@@ -24,6 +26,7 @@ def list_papers(
 
     return PaperSearchResponse(papers=[PaperResponse.model_validate(paper) for paper in papers], total=total)
 
+
 @router.get("/search")
 def search_papers(
     db: SessionDep,
@@ -34,7 +37,7 @@ def search_papers(
     published_before: Optional[datetime] = None,
     limit: int = 20,
     offset: int = 0,
-):
+) -> PaperSearchResponse:
     filters = PaperSearchFilters(
         query=q,
         categories=categories,
@@ -43,16 +46,12 @@ def search_papers(
         published_before=published_before,
     )
 
-    repo = PaperRepository(session)
-    papers, total = repo.search(filters, limit, offset)
+    repo = PaperRepository(db)
+    papers = repo.search(filters, limit, offset)
+    # Get total count for pagination info
+    total = repo.get_count()
 
-    return {
-        "items": papers,
-        "total": total,
-        "limit": limit,
-        "offset": offset,
-    }
-
+    return PaperSearchResponse(papers=[PaperResponse.model_validate(paper) for paper in papers], total=total)
 
 
 @router.get("/{arxiv_id}", response_model=PaperResponse)

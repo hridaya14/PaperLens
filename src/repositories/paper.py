@@ -5,7 +5,6 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from src.models.paper import Paper
-from sqlalchemy.dialects.postgresql import plainto_tsquery
 from src.schemas.arxiv.paper import PaperCreate, PaperSearchFilters
 
 
@@ -33,12 +32,12 @@ class PaperRepository:
             Paper.published_date.desc()).limit(limit).offset(offset)
         return list(self.session.scalars(stmt))
 
-    def search(self, filters: PaperSearchFilters, limit: int = 20, offset: int = 0,):
+    def search(self, filters: PaperSearchFilters, limit: int = 20, offset: int = 0,) -> List[Paper]:
         stmt = select(Paper)
 
         # ---- Full-text search ----
         if filters.query:
-            ts_query = plainto_tsquery("english", filters.query)
+            ts_query = func.plainto_tsquery("english", filters.query)
             rank_expr = func.ts_rank_cd(Paper.search_vector, ts_query)
 
             stmt = stmt.where(
@@ -76,7 +75,6 @@ class PaperRepository:
         stmt = stmt.limit(limit).offset(offset)
 
         return list(self.session.scalars(stmt))
-
 
     def get_count(self) -> int:
         stmt = select(func.count(Paper.id))

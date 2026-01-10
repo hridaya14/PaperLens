@@ -1,5 +1,3 @@
-<!-- Improved compatibility of back to top link: See: https://github.com/othneildrew/Best-README-Template/pull/73 -->
-
 <a id="readme-top"></a>
 
 <!-- PROJECT SHIELDS -->
@@ -26,11 +24,11 @@
     <a href="https://github.com/othneildrew/Best-README-Template"><strong>Explore the docs »</strong></a>
     <br />
     <br />
-    <a href="https://github.com/othneildrew/Best-README-Template">View Demo</a>
+    <a href="https://github.com/hridaya14/PaperLens">View Demo</a>
     &middot;
-    <a href="https://github.com/othneildrew/Best-README-Template/issues/new?labels=bug&template=bug-report---.md">Report Bug</a>
+    <a href="https://github.com/hridaya14/PaperLens/issues/new?labels=bug&template=bug-report---.md">Report Bug</a>
     &middot;
-    <a href="https://github.com/othneildrew/Best-README-Template/issues/new?labels=enhancement&template=feature-request---.md">Request Feature</a>
+    <a href="https://github.com/hridaya14/PaperLens/issues/new?labels=enhancement&template=feature-request---.md">Request Feature</a>
   </p>
 </div>
 
@@ -136,7 +134,53 @@ docker compose up --build -d
 
 ## Usage
 
-Use this space to show useful examples of how a project can be used. Additional screenshots, code examples and demos work well in this space. You may also link to more resources.
+### 1. Paper Search & Reading
+
+PaperLens allows users to **search, filter, and browse ingested research papers** across multiple arXiv categories.
+
+Current capabilities include:
+
+- Keyword and semantic search over indexed papers
+- Category-based filtering (bug will be fixed in next update)
+- Paper preview and structured reading within the UI
+
+Planned enhancements:
+
+- Inline note-taking while reading papers
+- Personal research annotations and highlights
+
+<!-- GIF / Screenshot placeholder -->
+<p align="center">
+  <img src="public/papers.png" alt="Paper search UI" width="90%" />
+</p>
+
+<p align="center">
+  <img src="public/pdf_view.png" alt="Paper view UI" width="90%" />
+</p>
+
+
+---
+
+### 2. RAG-Based Question Answering (Coming Soon)
+
+PaperLens provides a Retrieval-Augmented Generation (RAG) interface that enables
+paper-cited, hallucination-minimized responses from LLMs.
+
+Planned capabilities:
+
+- Ask questions grounded strictly in retrieved papers
+- Paper-level and corpus-level querying
+- Clear attribution of responses to source papers
+
+### 3. Daily Research Digest (Coming Soon)
+
+PaperLens will generate daily reports of newly ingested papers, designed to
+function as a research digest.
+
+Planned features:
+
+- Category-wise summaries of new papers
+- High-level overviews for tracking research trends
 
 _For more examples, please refer to the [Documentation](https://example.com)_
 
@@ -182,8 +226,8 @@ Don't forget to give the project a star! Thanks again!
 
 ### Top contributors:
 
-<a href="https://github.com/othneildrew/Best-README-Template/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=othneildrew/Best-README-Template" alt="contrib.rocks image" />
+<a href="https://github.com/hridaya14/PaperLens/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=hridaya14/PaperLens" alt="contrib.rocks image" />
 </a>
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
@@ -192,7 +236,7 @@ Don't forget to give the project a star! Thanks again!
 
 ## License
 
-Distributed under the Unlicense License. See `LICENSE.txt` for more information.
+Distributed under the MIT License. See `LICENSE.txt` for more information.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -200,9 +244,9 @@ Distributed under the Unlicense License. See `LICENSE.txt` for more information.
 
 ## Contact
 
-Your Name - [@your_twitter](https://twitter.com/your_username) - email@example.com
+Hridaya Sharma - [@hridayasharma5](https://x.com/hridayasharma5) - sharma.hridaya14@gmail.com
 
-Project Link: [https://github.com/your_username/repo_name](https://github.com/your_username/repo_name)
+Project Link: [https://github.com/hridaya14/PaperLens](https://github.com/hridaya14/PaperLens)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -210,10 +254,16 @@ Project Link: [https://github.com/your_username/repo_name](https://github.com/yo
 
 ## Acknowledgments
 
+- **arXiv**
+  “Thank you to arXiv for use of its open access interoperability.”
+  https://arxiv.org
+
+- **JamwithAI – Paper Curator**
+  This project is an extension of JamwithAI’s Paper Curator project.
+  PaperLens builds upon their paper ingestion and indexing pipeline and integrates it into a larger, more extensible research ecosystem with additional retrieval, generation, and UI layers.
+  https://github.com/jamwithai/arxiv-paper-curator
+
 - [Choose an Open Source License](https://choosealicense.com)
-- [GitHub Emoji Cheat Sheet](https://www.webpagefx.com/tools/emoji-cheat-sheet)
-- [Malven's Flexbox Cheatsheet](https://flexbox.malven.co/)
-- [Malven's Grid Cheatsheet](https://grid.malven.co/)
 - [Img Shields](https://shields.io)
 - [GitHub Pages](https://pages.github.com)
 - [Font Awesome](https://fontawesome.com)
@@ -224,7 +274,7 @@ Project Link: [https://github.com/your_username/repo_name](https://github.com/yo
 <!-- MARKDOWN LINKS & IMAGES -->
 
 [contributors-shield]: https://img.shields.io/github/contributors/hridaya14/PaperLens.svg?style=for-the-badge
-[contributors-url]: https://github.com/othneildrew/Best-README-Template/graphs/contributors
+[contributors-url]: https://github.com/hridaya14/PaperLens/graphs/contributors
 [forks-shield]: https://img.shields.io/github/forks/hridaya14/PaperLens.svg?style=for-the-badge
 [forks-url]: https://github.com/hridaya14/PaperLens/network/members
 [stars-shield]: https://img.shields.io/github/stars/hridaya14/PaperLens.svg?style=for-the-badge
@@ -236,6 +286,8 @@ Project Link: [https://github.com/your_username/repo_name](https://github.com/yo
 [linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=555
 [linkedin-url]: https://www.linkedin.com/in/hridaya-sharma-55513717b/
 [product-screenshot]: public/architecture.png
+[papers-list]: public/papers.png
+[papers-viewer]: public/pdf_view.png
 [FastAPI]: https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white
 [FastAPI-url]: https://fastapi.tiangolo.com/
 [Streamlit]: https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white
