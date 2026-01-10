@@ -6,7 +6,7 @@ from openai import OpenAI, APIConnectionError, APITimeoutError, OpenAIError
 
 from src.config import get_settings
 from src.exceptions import OllamaConnectionError, OllamaException, OllamaTimeoutError
-from src.schemas.nvidia import RAGResponse
+from src.schemas.nvidia import RAGResponse, ResponseMetadata
 from src.services.nvidia.prompts import RAGPromptBuilder, ResponseParser, response_format
 import traceback
 
@@ -191,6 +191,8 @@ class NvidiaClient:
                 logger.debug(f"Raw LLM response: {raw_response[:400]}")
                 parsed_response = self.response_parser.parse_structured_response(
                     raw_response)
+                metadata = parsed_response.get(
+                    "metadata") or ResponseMetadata().model_dump()
 
                 # Ensure sources exist
                 if not parsed_response.get("sources"):
@@ -205,6 +207,8 @@ class NvidiaClient:
                                 sources.append(pdf_url)
                                 seen.add(pdf_url)
                     parsed_response["sources"] = sources
+                    metadata.setdefault("diagnostics", []).append(
+                        "sources inferred from retrieved chunks")
 
                 # Add citations if missing
                 if not parsed_response.get("citations"):
@@ -213,6 +217,11 @@ class NvidiaClient:
                             for chunk in chunks if chunk.get("arxiv_id"))
                     )
                     parsed_response["citations"] = citations[:5]
+                    if citations:
+                        metadata.setdefault("diagnostics", []).append(
+                            "citations inferred from retrieved chunks")
+
+                parsed_response["metadata"] = metadata
 
                 return parsed_response
 
