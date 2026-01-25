@@ -6,7 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from src.models.paper import Paper
 from src.schemas.arxiv.paper import PaperCreate, PaperSearchFilters
-
+from sqlalchemy import or_
 
 class PaperRepository:
     def __init__(self, session: Session):
@@ -50,11 +50,15 @@ class PaperRepository:
             stmt = stmt.order_by(Paper.published_date.desc())
 
         # ---- Category filter ----
-        if filters.categories:
-            stmt = stmt.where(
-                Paper.categories.op("@>")(filters.categories)
-            )
 
+        if categories:
+            stmt = stmt.where(
+                or_(*[
+                    Paper.categories.contains([cat])
+                    for cat in filters.categories
+                ])
+            )
+        
         # ---- PDF processed filter ----
         if filters.pdf_processed is not None:
             stmt = stmt.where(Paper.pdf_processed == filters.pdf_processed)

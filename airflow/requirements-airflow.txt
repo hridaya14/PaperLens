@@ -12,3 +12,6 @@ opensearch-py>=2.4.0
 
 # Database drivers
 psycopg2-binary>=2.9.0
+
+# OpenAI Client
+openai

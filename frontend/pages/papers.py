@@ -91,15 +91,19 @@ with st.sidebar.form("paper_search_form"):
 
     query = st.text_input("Search by title")
 
+        CODE_TO_NAME = {
+        "cs.AI": "Artificial Intelligence",
+        "cs.CV": "Computer Vision",
+        "cs.CL": "Natural Language Processing",
+        "cs.LG": "Machine Learning",
+        "cs.RO": "Robotics",
+        "cs.SY": "Systems",
+    }
+
     categories = st.multiselect(
         "Categories",
-        [
-            "Computer Vision",
-            "Natural Language Processing",
-            "Robotics",
-            "Machine Learning",
-            "Systems",
-        ],
+        options=list(CODE_TO_NAME.keys()),
+        format_func=lambda c: CODE_TO_NAME[c],
     )
 
     pdf_processed = st.selectbox(
