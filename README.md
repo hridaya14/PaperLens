@@ -115,7 +115,7 @@ cd PaperLens
 cp .env.example .env
 # Add:
 # - Jina AI embeddings API key
-# - OpenAI-compatible LLM API key
+# - NVIDIA-NIM API KEY
 ```
 
 ```bash
@@ -161,7 +161,7 @@ Planned enhancements:
 
 ---
 
-### 2. RAG-Based Question Answering (Coming Soon)
+### 2. RAG-Based Question Answering
 
 PaperLens provides a Retrieval-Augmented Generation (RAG) interface that enables
 paper-cited, hallucination-minimized responses from LLMs.
@@ -171,6 +171,11 @@ Planned capabilities:
 - Ask questions grounded strictly in retrieved papers
 - Paper-level and corpus-level querying
 - Clear attribution of responses to source papers
+
+<!-- GIF / Screenshot placeholder -->
+<p align="center">
+  <img src="public/chat.png" alt="Paper search UI" width="90%" />
+</p>
 
 ### 3. Daily Research Digest (Coming Soon)
 
@@ -197,11 +202,11 @@ _For more examples, please refer to the [Documentation](https://example.com)_
 - [x] Modular, model-agnostic LLM generation layer
 - [x] Streamlit-based paper reading and RAG UI
 - [x] Fully dockerized, one-command setup
+- [x] **Category-based paper repository UI**
 
 ### Planned
 
 - [ ] **Redis caching** for faster retrieval and response times
-- [ ] **Category-based paper repository UI**
 - [ ] **Paper-specific RAG** (single-paper querying, NotebookLM-style)
 - [ ] **Daily paper ingestion reports** (category-wise summaries)
 - [ ] **Langfuse integration** for tracing, evaluation, and prompt versioning
