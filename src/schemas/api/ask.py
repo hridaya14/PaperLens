@@ -1,6 +1,7 @@
 from typing import List, Optional
 
 from pydantic import BaseModel, Field
+from src.schemas.nvidia import ResponseMetadata
 
 
 class AskRequest(BaseModel):
@@ -35,10 +36,16 @@ class AskResponse(BaseModel):
     query: str = Field(..., description="Original user question")
     answer: str = Field(..., description="Generated answer from LLM")
     sources: List[str] = Field(..., description="PDF URLs of source papers")
+    citations: List[str] = Field(default_factory=list,
+                                 description="Cited arXiv identifiers referenced in the answer")
     chunks_used: int = Field(...,
                              description="Number of chunks used for generation")
     search_mode: str = Field(...,
                              description="Search mode used: bm25 or hybrid")
+    metadata: ResponseMetadata = Field(
+        default_factory=ResponseMetadata,
+        description="Metadata describing response completeness and diagnostics",
+    )
 
     class Config:
         json_schema_extra = {
@@ -46,7 +53,14 @@ class AskResponse(BaseModel):
                 "query": "What are transformers in machine learning?",
                 "answer": "Transformers are a neural network architecture...",
                 "sources": ["https://arxiv.org/pdf/1706.03762.pdf", "https://arxiv.org/pdf/1810.04805.pdf"],
+                "citations": ["1706.03762", "1810.04805"],
                 "chunks_used": 3,
                 "search_mode": "hybrid",
+                "metadata": {
+                    "confidence": "medium",
+                    "is_partial": False,
+                    "is_unanswerable": False,
+                    "diagnostics": [],
+                },
             }
         }

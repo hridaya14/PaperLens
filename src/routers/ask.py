@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from src.dependencies import EmbeddingsDep, NvidiaDep, OpenSearchDep
 from src.schemas.api.ask import AskRequest, AskResponse
+from src.schemas.nvidia import ResponseMetadata
 
 logger = logging.getLogger(__name__)
 
@@ -112,8 +113,15 @@ async def ask_question(
                 query=request.query,
                 answer="I couldn't find any relevant information in the papers to answer your question.",
                 sources=[],
+                citations=[],
                 chunks_used=0,
                 search_mode=search_mode,
+                metadata=ResponseMetadata(
+                    confidence="low",
+                    is_partial=True,
+                    is_unanswerable=True,
+                    diagnostics=["No chunks retrieved for query"],
+                ),
             )
 
         logger.info(f"Retrieved {len(chunks)} chunks, generating answer with {
@@ -130,8 +138,10 @@ async def ask_question(
             query=request.query,
             answer=rag_response.get("answer", "Unable to generate answer"),
             sources=sources,  # Use sources from search results
+            citations=rag_response.get("citations", []),
             chunks_used=len(chunks),
             search_mode=search_mode,
+            metadata=ResponseMetadata(**rag_response.get("metadata", {})),
         )
 
         logger.info(f"Successfully generated answer for query: '{
