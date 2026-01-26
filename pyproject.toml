@@ -1,7 +1,7 @@
 [project]
 name = "paperlens"
 version = "0.1.0"
-description = "AI Agent for daily detailed analysis of research papers"
+description = "Research System for daily detailed analysis of research papers"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
@@ -20,7 +20,8 @@ dependencies = [
     "sentence-transformers>=5.1.0",
     "gradio>=4.0.0",
     "mcp>=1.13.1",
-    "openai"
+    "openai",
+    "alembic>=1.13.3"
 ]
 
 [dependency-groups]

@@ -3,6 +3,7 @@ import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+import re
 
 from dateutil import parser as date_parser
 from sqlalchemy.orm import Session
@@ -16,6 +17,30 @@ from src.services.opensearch.client import OpenSearchClient
 from src.services.pdf_parser.parser import PDFParserService
 
 logger = logging.getLogger(__name__)
+
+_INVALID_CHARS = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F]")
+
+
+def clean_text(value: str | None) -> str | None:
+    if value is None:
+        return None
+    return _INVALID_CHARS.sub("", value)
+
+
+def clean_value(v):
+    if isinstance(v, str):
+        return clean_text(v)
+    return v
+
+
+def clean_json(obj):
+    if isinstance(obj, dict):
+        return {k: clean_json(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [clean_json(v) for v in obj]
+    if isinstance(obj, str):
+        return clean_text(obj)
+    return obj
 
 
 class MetadataFetcher:
@@ -356,12 +381,6 @@ class MetadataFetcher:
             Number of papers stored successfully
         """
 
-        def clean_str(s):
-            """Remove NUL bytes and strip whitespace."""
-            if isinstance(s, str):
-                return s.replace("\x00", "").strip()
-            return s
-
         paper_repo = PaperRepository(db_session)
         stored_count = 0
 
@@ -376,31 +395,36 @@ class MetadataFetcher:
                         paper.published_date, str) else paper.published_date
                 )
                 paper_data = {
-                    "arxiv_id": clean_str(paper.arxiv_id),
-                    "title": clean_str(paper.title),
-                    "authors": clean_str(paper.authors),
-                    "abstract": clean_str(paper.abstract),
-                    "categories": clean_str(paper.categories),
+                    "arxiv_id": clean_value(paper.arxiv_id),
+                    "title": clean_value(paper.title),
+                    "authors": clean_value(paper.authors),
+                    "abstract": clean_value(paper.abstract),
+                    "categories": clean_value(paper.categories),
                     "published_date": published_date,
-                    "pdf_url": clean_str(paper.pdf_url),
+                    "pdf_url": clean_value(paper.pdf_url),
                 }
                 # Add parsed content if available
                 if parsed_paper:
                     parsed_content = self._serialize_parsed_content(
                         parsed_paper)
+                    parsed_content = clean_json(parsed_content)
                     paper_data.update(parsed_content)
                     logger.debug(
-                        f"Storing paper {paper.arxiv_id} with parsed content ({len(parsed_content.get(
-                            'raw_text', '')) if parsed_content.get('raw_text') else 0} chars)"
+                        f"Storing paper {paper.arxiv_id} with parsed content "
+                        f"({len(parsed_content.get('raw_text', ''))} chars)"
                     )
                 else:
                     # No parsed content - just store metadata
                     paper_data.update(
-                        {"pdf_processed": False, "parser_metadata": {
-                            "note": "PDF processing not available or failed"}}
+                        clean_json({
+                            "pdf_processed": False,
+                            "parser_metadata": {
+                                "note": "PDF processing not available or failed"
+                            }
+                        })
                     )
                     logger.debug(f"Storing paper {
-                                 paper.arxiv_id} with metadata only")
+                        paper.arxiv_id} with metadata only")
 
                 paper_create = PaperCreate(**paper_data)
                 stored_paper = paper_repo.upsert(paper_create)
@@ -413,7 +437,8 @@ class MetadataFetcher:
 
             except Exception as e:
                 logger.error(f"Failed to store paper {paper.arxiv_id}: {e}")
-
+                db_session.rollback()  # 🔴 REQUIRED
+                continue
         # Commit all changes
         try:
             db_session.commit()
@@ -423,6 +448,7 @@ class MetadataFetcher:
             logger.error(f"Failed to commit papers to database: {e}")
             db_session.rollback()
             stored_count = 0
+            return 0
 
         return stored_count
 

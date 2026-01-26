@@ -5,8 +5,8 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from src.models.paper import Paper
-from src.schemas.arxiv.paper import PaperCreate
-
+from src.schemas.arxiv.paper import PaperCreate, PaperSearchFilters
+from sqlalchemy import or_
 
 class PaperRepository:
     def __init__(self, session: Session):
@@ -30,6 +30,54 @@ class PaperRepository:
     def get_all(self, limit: int = 100, offset: int = 0) -> List[Paper]:
         stmt = select(Paper).order_by(
             Paper.published_date.desc()).limit(limit).offset(offset)
+        return list(self.session.scalars(stmt))
+
+    def search(self, filters: PaperSearchFilters, limit: int = 20, offset: int = 0,) -> List[Paper]:
+        stmt = select(Paper)
+
+        # ---- Full-text search ----
+        if filters.query:
+            ts_query = func.plainto_tsquery("english", filters.query)
+            rank_expr = func.ts_rank_cd(Paper.search_vector, ts_query)
+
+            stmt = stmt.where(
+                Paper.search_vector.op("@@")(ts_query)
+            ).order_by(
+                rank_expr.desc(),
+                Paper.published_date.desc(),
+            )
+        else:
+            stmt = stmt.order_by(Paper.published_date.desc())
+
+        # ---- Category filter ----
+
+        if filters.categories:
+            stmt = stmt.where(
+                or_(*[
+                    Paper.categories.contains([cat])
+                    for cat in filters.categories
+                ])
+            )
+        
+        # ---- PDF processed filter ----
+        if filters.pdf_processed is not None:
+            stmt = stmt.where(Paper.pdf_processed == filters.pdf_processed)
+
+        # ---- Date range filters ----
+        if filters.published_after:
+            stmt = stmt.where(Paper.published_date >= filters.published_after)
+
+        if filters.published_before:
+            stmt = stmt.where(Paper.published_date <= filters.published_before)
+
+        # ---- Total count (before pagination) ----
+        total = self.session.scalar(
+            select(func.count()).select_from(stmt.subquery())
+        ) or 0
+
+        # ---- Pagination ----
+        stmt = stmt.limit(limit).offset(offset)
+
         return list(self.session.scalars(stmt))
 
     def get_count(self) -> int:

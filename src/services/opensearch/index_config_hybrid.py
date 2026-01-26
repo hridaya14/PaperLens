@@ -37,7 +37,7 @@ ARXIV_PAPERS_CHUNKS_MAPPING = {
             "end_char": {"type": "integer"},
             "embedding": {
                 "type": "knn_vector",
-                "dimension": 1024,  # Jina v3 embeddings dimension
+                "dimension": 2048,  # Jina v3 embeddings dimension
                 "method": {
                     "name": "hnsw",  # Hierarchical Navigable Small World
                     "space_type": "cosinesimil",  # Cosine similarity

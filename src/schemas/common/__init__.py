@@ -8,6 +8,7 @@ from src.schemas.arxiv.paper import (
     PaperCreate,
     PaperResponse,
     PaperSearchResponse,
+    PaperSearchFilters
 )
 
 # Database schemas

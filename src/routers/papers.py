@@ -1,8 +1,10 @@
+from datetime import datetime
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from sqlalchemy.orm import Session
 from src.dependencies import SessionDep
 from src.repositories.paper import PaperRepository
-from src.schemas.arxiv.paper import PaperResponse, PaperSearchResponse
+from src.schemas.arxiv.paper import PaperResponse, PaperSearchFilters, PaperSearchResponse
 
 router = APIRouter(prefix="/papers", tags=["papers"])
 
@@ -21,6 +23,33 @@ def list_papers(
 
     # Get total count for pagination info
     total = paper_repo.get_count()
+
+    return PaperSearchResponse(papers=[PaperResponse.model_validate(paper) for paper in papers], total=total)
+
+
+@router.get("/search")
+def search_papers(
+    db: SessionDep,
+    q: Optional[str] = None,
+    categories: Optional[List[str]] = Query(None),
+    pdf_processed: Optional[bool] = None,
+    published_after: Optional[datetime] = None,
+    published_before: Optional[datetime] = None,
+    limit: int = 20,
+    offset: int = 0,
+) -> PaperSearchResponse:
+    filters = PaperSearchFilters(
+        query=q,
+        categories=categories,
+        pdf_processed=pdf_processed,
+        published_after=published_after,
+        published_before=published_before,
+    )
+
+    repo = PaperRepository(db)
+    papers = repo.search(filters, limit, offset)
+    # Get total count for pagination info
+    total = repo.get_count()
 
     return PaperSearchResponse(papers=[PaperResponse.model_validate(paper) for paper in papers], total=total)
 
