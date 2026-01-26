@@ -4,7 +4,7 @@ import requests
 from typing import List, Optional
 from datetime import datetime
 
-API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
+API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000/api/v1")
 
 
 def search_papers(
@@ -34,6 +34,15 @@ def search_papers(
         f"{API_BASE_URL}/papers/search",
         params=params,
         timeout=10,
+    )
+    response.raise_for_status()
+    return response.json()
+
+def ask_question(payload: dict):
+    response = requests.post(
+        f"{API_BASE_URL}/ask",
+        json=payload,
+        timeout=60,
     )
     response.raise_for_status()
     return response.json()

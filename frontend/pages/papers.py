@@ -91,7 +91,7 @@ with st.sidebar.form("paper_search_form"):
 
     query = st.text_input("Search by title")
 
-        CODE_TO_NAME = {
+    CODE_TO_NAME = {
         "cs.AI": "Artificial Intelligence",
         "cs.CV": "Computer Vision",
         "cs.CL": "Natural Language Processing",

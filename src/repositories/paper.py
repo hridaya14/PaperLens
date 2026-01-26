@@ -51,7 +51,7 @@ class PaperRepository:
 
         # ---- Category filter ----
 
-        if categories:
+        if filters.categories:
             stmt = stmt.where(
                 or_(*[
                     Paper.categories.contains([cat])
