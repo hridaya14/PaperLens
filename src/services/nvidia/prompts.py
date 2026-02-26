@@ -1,45 +1,26 @@
 import json
 import re
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from pydantic import ValidationError
 from src.schemas.nvidia import RAGResponse
+from pydantic import BaseModel
+from enum import Enum
 
-response_format = {
-    "type": "json_schema",
-    "json_schema": {
-        "name": "rag_response",
-        "strict": True,
-        "schema": {
-            "type": "object",
-            "properties": {
-                "answer": {
-                    "type": "string",
-                    "description": "Comprehensive answer based on the provided paper excerpts"
-                },
-                "sources": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "List of PDF URLs from papers used in the answer"
-                },
-                "confidence": {
-                    "type": ["string", "null"],
-                    "enum": ["high", "medium", "low", None],
-                    "description": "Confidence level"
-                },
-                "citations": {
-                    "type": ["array", "null"],
-                    "items": {"type": "string"},
-                    "description": "Specific arXiv IDs referenced in the answer"
-                },
-            },
-            "required": ["answer"],
-            "additionalProperties": False
-        }
-    }
-}
+class Confidence(str, Enum):
+    low = "low"
+    medium = "medium"
+    high = "high"
 
+class LLMResponse(BaseModel):
+    answer: str
+    sources: list[str]
+    confidence: Optional[Confidence]
+    citations: Optional[list[str]]
+
+class UnstructuredResponse(BaseModel):
+    answer: str
 
 class RAGPromptBuilder:
     """Builder class for creating RAG prompts."""
@@ -162,3 +143,4 @@ class ResponseParser:
             "confidence": "low",
             "citations": [],
         }
+
