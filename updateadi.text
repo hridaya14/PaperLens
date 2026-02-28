@@ -1,0 +1,10 @@
+Updates summary (flashcards feature):
+- Added migration `alembic/versions/0003_add_flashcards_table.py` to create flashcards table with TTL and indices.
+- New schemas: `src/schemas/api/flashcards.py`, `src/schemas/flashcards.py`, and exports in `src/schemas/api/__init__.py`.
+- Repository: `src/repositories/flashcards.py` for CRUD, freshness, and cleanup.
+- Service: `src/services/flashcards.py` orchestrates generation via NIM, caching, and expiry cleanup.
+- Nvidia client: added `summarize_for_flashcard` helper in `src/services/nvidia/client.py`.
+- Dependencies: wired flashcard repo/service in `src/dependencies.py`.
+- Routers: `src/routers/flashcards.py` with endpoints; registered in `src/routers/__init__.py` and `src/main.py`.
+- Frontend: new Streamlit page `frontend/pages/flashcards.py`; category list in `frontend/config.py` switched to arXiv codes.
+- Tests: placeholder `tests/api/test_flashcards.py`.

@@ -10,6 +10,8 @@ from src.services.embeddings.jina_client import JinaEmbeddingsClient
 from src.services.nvidia.client import NvidiaClient
 from src.services.opensearch.client import OpenSearchClient
 from src.services.pdf_parser.parser import PDFParserService
+from src.repositories.flashcards import FlashcardsRepository
+from src.services.flashcards import FlashcardService
 
 
 @lru_cache
@@ -59,6 +61,26 @@ def get_nvidia_client(request: Request) -> NvidiaClient:
     return request.app.state.nvidia_client
 
 
+def get_flashcards_repo(
+    database: Annotated[BaseDatabase, Depends(get_database)],
+) -> FlashcardsRepository:
+    """Create flashcards repository (non-cached, per-request)."""
+    with database.get_session() as session:
+        yield FlashcardsRepository(session)
+
+
+def get_flashcards_service(
+    database: Annotated[BaseDatabase, Depends(get_database)],
+    nvidia_client: Annotated[NvidiaClient, Depends(get_nvidia_client)],
+) -> FlashcardService:
+    """Provide flashcard service with DB repo and NIM client."""
+    # For simplicity, open a session per call; service uses it synchronously.
+    with database.get_session() as session:
+        repo = FlashcardsRepository(session)
+        service = FlashcardService(repo=repo, nvidia_client=nvidia_client)
+        yield service
+
+
 # Dependency annotations
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 DatabaseDep = Annotated[BaseDatabase, Depends(get_database)]
@@ -69,3 +91,5 @@ PDFParserDep = Annotated[PDFParserService, Depends(get_pdf_parser)]
 EmbeddingsDep = Annotated[JinaEmbeddingsClient,
                           Depends(get_embeddings_service)]
 NvidiaDep = Annotated[NvidiaClient, Depends(get_nvidia_client)]
+FlashcardsServiceDep = Annotated[FlashcardService,
+                                 Depends(get_flashcards_service)]

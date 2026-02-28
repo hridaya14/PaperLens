@@ -1,9 +1,10 @@
 APP_TITLE = "PaperLens – Research Workspace"
 
 CATEGORIES = [
-    "Computer Vision",
-    "Natural Language Processing",
-    "Robotics",
-    "Machine Learning",
-    "Systems",
+    "cs.AI",
+    "cs.LG",
+    "cs.CV",
+    "cs.CL",
+    "cs.RO",
+    "cs.SY",
 ]

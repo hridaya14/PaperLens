@@ -3,10 +3,44 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from pydantic import ValidationError
+from pydantic import ValidationError, BaseModel
 from src.schemas.nvidia import RAGResponse
-from pydantic import BaseModel
 from enum import Enum
+
+# Structured response format for OpenAI-compatible response_format parameter
+response_format = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "rag_response",
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "properties": {
+                "answer": {
+                    "type": "string",
+                    "description": "Comprehensive answer based on the provided paper excerpts"
+                },
+                "sources": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of PDF URLs from papers used in the answer"
+                },
+                "confidence": {
+                    "type": ["string", "null"],
+                    "enum": ["high", "medium", "low", None],
+                    "description": "Confidence level"
+                },
+                "citations": {
+                    "type": ["array", "null"],
+                    "items": {"type": "string"},
+                    "description": "Specific arXiv IDs referenced in the answer"
+                },
+            },
+            "required": ["answer"],
+            "additionalProperties": False
+        }
+    }
+}
 
 class Confidence(str, Enum):
     low = "low"
@@ -143,4 +177,3 @@ class ResponseParser:
             "confidence": "low",
             "citations": [],
         }
-

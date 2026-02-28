@@ -7,7 +7,7 @@ from openai import OpenAI, APIConnectionError, APITimeoutError, OpenAIError
 from src.config import get_settings
 from src.exceptions import OllamaConnectionError, OllamaException, OllamaTimeoutError
 from src.schemas.nvidia import RAGResponse
-from src.services.nvidia.prompts import RAGPromptBuilder, ResponseParser, LLMResponse,UnstructuredResponse 
+from src.services.nvidia.prompts import RAGPromptBuilder, ResponseParser, response_format
 import traceback
 
 logger = logging.getLogger(__name__)
@@ -100,13 +100,12 @@ class NvidiaClient:
                 raise OllamaException(
                     "Use generate_stream() for streaming responses")
 
-            completion = self.client.chat.completions.parse(
+            completion = self.client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=kwargs.get("temperature", 0.7),
                 top_p=kwargs.get("top_p", 0.9),
                 max_tokens=kwargs.get("max_tokens", 2048),
-                response_format=kwargs.get("response_format",UnstructuredResponse)
             )
 
             return {"response": completion.choices[0].message.content}
@@ -175,7 +174,7 @@ class NvidiaClient:
                     prompt=prompt,
                     temperature=0.7,
                     top_p=0.9,
-                    response_format=LLMResponse,
+                    response_format=response_format,
                 )
             else:
                 prompt = self.prompt_builder.create_rag_prompt(query, chunks)
@@ -184,51 +183,40 @@ class NvidiaClient:
                     prompt=prompt,
                     temperature=0.7,
                     top_p=0.9,
+                    response_format={"type": "json_object"},
                 )
 
-            # Response Validation
+            if response and "response" in response:
+                raw_response = response["response"]
+                logger.debug(f"Raw LLM response: {raw_response[:400]}")
+                parsed_response = self.response_parser.parse_structured_response(
+                    raw_response)
 
-            if not response or "response" not in response:
-                raise OllamaException("No response returned from LLM")
+                # Ensure sources exist
+                if not parsed_response.get("sources"):
+                    seen, sources = set(), []
+                    for chunk in chunks:
+                        arxiv_id = chunk.get("arxiv_id")
+                        if arxiv_id:
+                            clean_id = arxiv_id.split(
+                                "v")[0] if "v" in arxiv_id else arxiv_id
+                            pdf_url = f"https://arxiv.org/pdf/{clean_id}"
+                            if pdf_url not in seen:
+                                sources.append(pdf_url)
+                                seen.add(pdf_url)
+                    parsed_response["sources"] = sources
 
-            parsed_response = response["response"].parsed
+                # Add citations if missing
+                if not parsed_response.get("citations"):
+                    citations = list(
+                        set(chunk.get("arxiv_id")
+                            for chunk in chunks if chunk.get("arxiv_id"))
+                    )
+                    parsed_response["citations"] = citations[:5]
 
-            if not isinstance(parsed_response, dict):
-                raise OllamaException(
-                    f"Expected dict response, got {type(parsed_response)}"
-                )
+                return parsed_response
 
-            if "answer" not in parsed_response or not parsed_response["answer"]:
-                raise OllamaException("LLM response missing required 'answer' field")
-
-            # Normalizing Sources
-            if "sources" not in parsed_response or not parsed_response["sources"]:
-                seen, sources = set(), []
-                for chunk in chunks:
-                    arxiv_id = chunk.get("arxiv_id")
-                    if arxiv_id:
-                        clean_id = arxiv_id.split("v")[0]
-                        if clean_id not in seen:
-                            sources.append(clean_id)
-                            seen.add(clean_id)
-                parsed_response["sources"] = sources
-
-            # Normalize Citations
-            if "citations" not in parsed_response or not parsed_response["citations"]:
-                parsed_response["citations"] = [
-                    f"[arXiv:{src}]" for src in parsed_response["sources"]
-                ]
-
-            # Handle missing confidence
-            if "confidence" not in parsed_response:
-                parsed_response["confidence"] = "medium"
-
-            return {
-            "answer": parsed_response["answer"],
-            "sources": parsed_response["sources"],
-            "citations": parsed_response["citations"],
-            "confidence": parsed_response["confidence"],
-            }
+            raise OllamaException("No structured response generated from LLM")
 
         except Exception as e:
             logger.error(f"Error generating RAG answer: {e}")
@@ -258,3 +246,42 @@ class NvidiaClient:
             raise OllamaException(
                 f"Failed to generate streaming RAG answer: {e}")
 
+    # --- Flashcard-specific helper ---
+    def summarize_for_flashcard(
+        self,
+        title: str,
+        content: str,
+        model: Optional[str] = None,
+        max_tokens: int = 256,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Generate a concise flashcard summary for a single paper.
+        """
+        model = model or self.default_model
+        prompt = (
+            "You are producing a concise flashcard for an arXiv paper.\n"
+            "Return a short headline (max 12 words), a one-sentence insight, and a brief 'why it matters'.\n"
+            "Format strictly as JSON with keys: headline, insight, why_it_matters.\n\n"
+            f"Title: {title}\n"
+            "Excerpt:\n"
+            f"{content[:1500]}\n"
+        )
+
+        try:
+            response = self.generate(
+                model=model,
+                prompt=prompt,
+                temperature=0.35,
+                top_p=0.9,
+                max_tokens=max_tokens,
+                response_format={"type": "json_object"},
+            )
+            if response and "response" in response:
+                parsed = self.response_parser.parse_structured_response(
+                    response["response"]
+                )
+                return parsed
+            return None
+        except Exception as e:
+            logger.error(f"Flashcard summarize failed: {e}")
+            return None
