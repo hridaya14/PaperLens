@@ -92,6 +92,97 @@ class RAGPromptBuilder:
             "format": RAGResponse.model_json_schema(),
         }
 
+class MindMapPromptBuilder:
+    """Builds prompts for mind map generation from paper chunks."""
+
+    _SKIP_SECTIONS = {
+        "references", "bibliography", "acknowledgements",
+        "acknowledgments", "appendix", "author contributions",
+        "conflict of interest", "funding", "disclosure",
+    }
+
+    def __init__(self, max_chars: int = 32_000):
+        self._max_chars = max_chars
+        self.prompts_dir = Path(__file__).parent / "prompts"
+        self.system_prompt = self._load_system_prompt()
+
+    def _load_system_prompt(self) -> str:
+        """Load the system prompt from the text file.
+
+        Returns:
+            System prompt string
+        """
+        prompt_file = self.prompts_dir / "mindmap.txt"
+        if not prompt_file.exists():
+            # Fallback to default prompt if file doesn't exist
+            return (
+                "You are an AI assistant specialized in answering questions about "
+                "academic papers from arXiv. Base your answer STRICTLY on the provided "
+                "paper excerpts."
+            )
+        return prompt_file.read_text().strip()
+
+    def build_prompt(
+        self,
+        paper_title: str,
+        arxiv_id: str,
+        chunks: list,   # list[TextChunk]
+    ) -> str:
+        sections = self._assemble_sections(chunks)
+        sections_block = "\n\n".join(
+            f"### {title or 'General'}\n{text}"
+            for title, text in sections
+        )
+        return (
+            f"{self.system_prompt}\n\n"
+            f"Paper Title: {paper_title}\n"
+            f"ArXiv ID: {arxiv_id}\n\n"
+            f"Paper Content:\n{sections_block}\n\n"
+            f"Generate the conceptual mind map JSON now:"
+        )
+
+    def _assemble_sections(self, chunks: list) -> list[tuple[str | None, str]]:
+        from collections import defaultdict
+
+        def get_chunk_index(c):
+            return c["chunk_index"] if isinstance(c, dict) else c.metadata.chunk_index
+
+        def get_section_title(c):
+            return c.get("section_title") if isinstance(c, dict) else c.metadata.section_title
+
+        def get_text(c):
+            return c.get("text", c.get("chunk_text", "")) if isinstance(c, dict) else c.text
+
+        sorted_chunks = sorted(chunks, key=get_chunk_index)
+
+        section_order: list[str] = []
+        section_texts: dict[str, list[str]] = defaultdict(list)
+
+        for chunk in sorted_chunks:
+            section = (get_section_title(chunk) or "").strip()
+            if section.lower() in self._SKIP_SECTIONS:
+                continue
+            key = section or "_unknown"
+            if key not in section_texts:
+                section_order.append(key)
+            section_texts[key].append(get_text(chunk))
+
+        sections: list[tuple[str | None, str]] = []
+        total_chars = 0
+
+        for key in section_order:
+            text = " ".join(section_texts[key])
+            if total_chars + len(text) > self._max_chars:
+                remaining = self._max_chars - total_chars
+                if remaining > 200:
+                    text = text[:remaining] + "..."
+                    sections.append((key if key != "_unknown" else None, text))
+                break
+            sections.append((key if key != "_unknown" else None, text))
+            total_chars += len(text)
+
+        return sections
+
 
 class ResponseParser:
     """Parser for LLM responses."""
@@ -143,4 +234,3 @@ class ResponseParser:
             "confidence": "low",
             "citations": [],
         }
-

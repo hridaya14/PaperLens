@@ -10,6 +10,9 @@ from src.services.embeddings.jina_client import JinaEmbeddingsClient
 from src.services.nvidia.client import NvidiaClient
 from src.services.opensearch.client import OpenSearchClient
 from src.services.pdf_parser.parser import PDFParserService
+from src.services.visualization.mindmaps.client import MindMapService
+from redis.asyncio import Redis
+
 
 
 @lru_cache
@@ -59,13 +62,25 @@ def get_nvidia_client(request: Request) -> NvidiaClient:
     return request.app.state.nvidia_client
 
 
+def get_redis_client(request: Request) -> Redis:
+   """Get redis client from the request state"""
+   return request.app.state.redis_client
+
+
+def get_mindmap_client(request: Request) -> MindMapService:
+    """Get Mindmap client from the request state"""
+    return request.app.state.mindmap_client
+
+
 # Dependency annotations
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 DatabaseDep = Annotated[BaseDatabase, Depends(get_database)]
 SessionDep = Annotated[Session, Depends(get_db_session)]
 OpenSearchDep = Annotated[OpenSearchClient, Depends(get_opensearch_client)]
+MindMapDep = Annotated[MindMapService, Depends(get_mindmap_client)]
 ArxivDep = Annotated[ArxivClient, Depends(get_arxiv_client)]
 PDFParserDep = Annotated[PDFParserService, Depends(get_pdf_parser)]
 EmbeddingsDep = Annotated[JinaEmbeddingsClient,
                           Depends(get_embeddings_service)]
 NvidiaDep = Annotated[NvidiaClient, Depends(get_nvidia_client)]
+RedisDep = Annotated[Redis, Depends(get_redis_client)]

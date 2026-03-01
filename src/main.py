@@ -6,13 +6,15 @@ import uvicorn
 from fastapi import FastAPI
 from src.config import get_settings
 from src.db.factory import make_database
-from src.routers import hybrid_search, ping, papers
+from src.routers import hybrid_search, ping, papers, visualization
 from src.routers.ask import ask_router, stream_router
 from src.services.arxiv.factory import make_arxiv_client
 from src.services.opensearch.factory import make_opensearch_client
 from src.services.embeddings.factory import make_embeddings_service
 from src.services.nvidia.factory import make_nvidia_client
 from src.services.pdf_parser.factory import make_pdf_parser_service
+from src.db.redis.redis import get_redis_client
+from src.services.visualization.mindmaps.factory import get_mindmap_service
 
 # Setup logging
 logging.basicConfig(
@@ -32,9 +34,15 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     app.state.settings = settings
 
+    # Initialize DB
     database = make_database()
     app.state.database = database
     logger.info("Database connected")
+
+    # Initialize Redis Cache Client
+    redis_client = get_redis_client()
+    app.state.redis_client = redis_client
+    logger.info("Redis client connected")
 
     # Initialize search service
     opensearch_client = make_opensearch_client()
@@ -68,6 +76,7 @@ async def lifespan(app: FastAPI):
     app.state.pdf_parser = make_pdf_parser_service()
     app.state.embeddings_service = make_embeddings_service()
     app.state.nvidia_client = make_nvidia_client()
+    app.state.mindmap_client = get_mindmap_service()
     logger.info(
         "Services initialized: arXiv API client, PDF parser, OpenSearch, Embeddings, Nvidia")
     logger.info("API ready")
@@ -80,7 +89,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="arXiv Paper Curator API",
-    description="Personal arXiv CS.AI paper curator with RAG capabilities",
+    description="Personal arXiv paper curator with Visualization, Detailed Analysis and RAG Features",
     version=os.getenv("APP_VERSION", "0.1.0"),
     lifespan=lifespan,
 )
@@ -90,6 +99,9 @@ app.include_router(ping.router, prefix="/api/v1")  # Health check endpoint
 app.include_router(papers.router, prefix="/api/v1")
 # Search chunks with BM25/hybrid
 app.include_router(hybrid_search.router, prefix="/api/v1")
+
+# Visualization Routers
+app.include_router(visualization.router, prefix="/api/v1")
 
 # RAG question answering with LLM
 app.include_router(ask_router, prefix="/api/v1")

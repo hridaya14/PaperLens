@@ -46,3 +46,11 @@ def ask_question(payload: dict):
     )
     response.raise_for_status()
     return response.json()
+
+def get_mindmap(arxiv_id: str):
+    response = requests.get(
+        f"{API_BASE_URL}/visualization/{arxiv_id}/mindmap",
+        timeout=120,  # generation can take 10-30s on first request
+    )
+    response.raise_for_status()
+    return response.json()

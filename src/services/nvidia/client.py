@@ -7,7 +7,7 @@ from openai import OpenAI, APIConnectionError, APITimeoutError, OpenAIError
 from src.config import get_settings
 from src.exceptions import OllamaConnectionError, OllamaException, OllamaTimeoutError
 from src.schemas.nvidia import RAGResponse
-from src.services.nvidia.prompts import RAGPromptBuilder, ResponseParser, LLMResponse,UnstructuredResponse 
+from src.services.nvidia.prompts import RAGPromptBuilder, MindMapPromptBuilder, ResponseParser, LLMResponse,UnstructuredResponse
 import traceback
 
 logger = logging.getLogger(__name__)
@@ -24,6 +24,7 @@ class NvidiaClient:
             base_url=settings.nvidia_base_url
         )
         self.prompt_builder = RAGPromptBuilder()
+        self.mindmap_prompt_builder = MindMapPromptBuilder()
         self.response_parser = ResponseParser()
         self.timeout = float(settings.nvidia_timeout)
         self.default_model = "meta/llama-3.3-70b-instruct"
@@ -258,3 +259,39 @@ class NvidiaClient:
             raise OllamaException(
                 f"Failed to generate streaming RAG answer: {e}")
 
+    def generate_mindmap(self, paper_title, arxiv_id, chunks, model=None):
+        try:
+            model = model or self.default_model
+
+            prompt = self.mindmap_prompt_builder.build_prompt(
+                paper_title=paper_title,
+                arxiv_id=arxiv_id,
+                chunks=chunks,
+            )
+
+            # Call completions directly without UnstructuredResponse wrapper
+            # so the LLM outputs raw JSON without being forced into {"answer": "..."}
+            completion = self.client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.3,
+                top_p=0.9,
+                max_tokens=4096,
+            )
+
+            raw_text = completion.choices[0].message.content
+
+            if not raw_text:
+                raise OllamaException("Empty response from LLM")
+
+            return {"raw": raw_text}
+
+        except OllamaConnectionError:
+            raise
+        except OllamaTimeoutError:
+            raise
+        except OllamaException:
+            raise
+        except Exception as e:
+            logger.error(f"Error generating mind map: {e}")
+            raise OllamaException(f"Failed to generate mind map: {e}")

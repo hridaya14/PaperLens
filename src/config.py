@@ -125,6 +125,12 @@ class Settings(BaseConfigSettings):
     # OpenSearch configuration
     opensearch_host: str = "http://localhost:9200"
 
+    # Redis configuration
+    redis_host: str = "localhost"
+    redis_port: int = 6379
+    redis_mindmap_ttl_seconds: int = 604800
+    redis_mindmap_cache_version: int = 1
+
     # Nvidia configuration
     nvidia_api_key: str = ""
     nvidia_base_url: str = ""
