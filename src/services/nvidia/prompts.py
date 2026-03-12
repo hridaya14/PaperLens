@@ -22,6 +22,8 @@ class LLMResponse(BaseModel):
 class UnstructuredResponse(BaseModel):
     answer: str
 
+response_format = None
+
 class RAGPromptBuilder:
     """Builder class for creating RAG prompts."""
 
