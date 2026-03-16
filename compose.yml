@@ -186,6 +186,23 @@ services:
         networks:
             - rag-network
 
+    new-frontend:
+        build:
+            context: ./new-frontend
+            dockerfile: Dockerfile
+        container_name: rag-new-frontend
+        ports:
+            - "3000:3000"
+        env_file:
+            - .env
+        environment:
+            - PAPERLENS_API_BASE_URL=http://api:8000/api/v1
+        depends_on:
+            api:
+                condition: service_healthy
+        networks:
+            - rag-network
+
     redis:
         image: redis:7-alpine
         ports:
