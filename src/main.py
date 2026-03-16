@@ -6,14 +6,15 @@ import uvicorn
 from fastapi import FastAPI
 from src.config import get_settings
 from src.db.factory import make_database
-from src.routers import hybrid_search, ping, papers, visualization
+from src.db.redis.redis import get_redis_client
+from src.routers import hybrid_search, papers, ping, visualization
 from src.routers.ask import ask_router, stream_router
 from src.services.arxiv.factory import make_arxiv_client
-from src.services.opensearch.factory import make_opensearch_client
 from src.services.embeddings.factory import make_embeddings_service
 from src.services.nvidia.factory import make_nvidia_client
+from src.services.opensearch.factory import make_opensearch_client
 from src.services.pdf_parser.factory import make_pdf_parser_service
-from src.db.redis.redis import get_redis_client
+from src.services.visualization.flashcards.factory import get_flashcard_service
 from src.services.visualization.mindmaps.factory import get_mindmap_service
 
 # Setup logging
@@ -61,15 +62,12 @@ async def lifespan(app: FastAPI):
 
         # Get simple statistics
         try:
-            stats = opensearch_client.client.count(
-                index=opensearch_client.index_name)
-            logger.info(f"OpenSearch ready: {
-                        stats['count']} documents indexed")
+            stats = opensearch_client.client.count(index=opensearch_client.index_name)
+            logger.info(f"OpenSearch ready: {stats['count']} documents indexed")
         except Exception:
             logger.info("OpenSearch index ready (stats unavailable)")
     else:
-        logger.warning(
-            "OpenSearch connection failed - search features will be limited")
+        logger.warning("OpenSearch connection failed - search features will be limited")
 
     # Initialize other services (kept for future endpoints and notebook demos)
     app.state.arxiv_client = make_arxiv_client()
@@ -77,8 +75,8 @@ async def lifespan(app: FastAPI):
     app.state.embeddings_service = make_embeddings_service()
     app.state.nvidia_client = make_nvidia_client()
     app.state.mindmap_client = get_mindmap_service()
-    logger.info(
-        "Services initialized: arXiv API client, PDF parser, OpenSearch, Embeddings, Nvidia")
+    app.state.flashcard_service = get_flashcard_service()
+    logger.info("Services initialized: arXiv API client, PDF parser, OpenSearch, Embeddings, Nvidia")
     logger.info("API ready")
     yield
 

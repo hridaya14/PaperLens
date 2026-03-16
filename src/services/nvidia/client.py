@@ -1,14 +1,19 @@
 import json
 import logging
-from typing import Any, Dict, List, Optional, Generator
+import traceback
+from typing import Any, Dict, Generator, List, Optional
 
-from openai import OpenAI, APIConnectionError, APITimeoutError, OpenAIError
-
+from openai import APIConnectionError, APITimeoutError, OpenAI, OpenAIError
 from src.config import get_settings
 from src.exceptions import OllamaConnectionError, OllamaException, OllamaTimeoutError
 from src.schemas.nvidia import RAGResponse
-from src.services.nvidia.prompts import RAGPromptBuilder, ResponseParser, response_format, MindMapPromptBuilder
-import traceback
+from src.services.nvidia.prompts import (
+    FlashcardPromptBuilder,
+    MindMapPromptBuilder,
+    RAGPromptBuilder,
+    ResponseParser,
+    response_format,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -19,13 +24,11 @@ class NvidiaClient:
     def __init__(self):
         """Initialize OpenAI client with NVIDIA endpoint and API key."""
         settings = get_settings()
-        self.client = OpenAI(
-            api_key=settings.nvidia_api_key,
-            base_url=settings.nvidia_base_url
-        )
+        self.client = OpenAI(api_key=settings.nvidia_api_key, base_url=settings.nvidia_base_url)
         self.prompt_builder = RAGPromptBuilder()
         self.response_parser = ResponseParser()
         self.mindmap_prompt_builder = MindMapPromptBuilder()
+        self.flashcard_prompt_builder = FlashcardPromptBuilder()
         self.timeout = float(settings.nvidia_timeout)
         self.default_model = "meta/llama-3.3-70b-instruct"
 
@@ -34,8 +37,7 @@ class NvidiaClient:
         try:
             logger.info("Performing NVIDIA LLM health check...")
             models = self.client.models.list()
-            logger.info(f"NVIDIA LLM endpoint reachable — {
-                        len(models.data)} models found.")
+            logger.info(f"NVIDIA LLM endpoint reachable — {len(models.data)} models found.")
             return {
                 "status": "healthy",
                 "message": "NVIDIA LLM endpoint reachable",
@@ -51,8 +53,7 @@ class NvidiaClient:
                 f"Details: {e}\n"
                 f"Traceback:\n{tb}"
             )
-            raise OllamaConnectionError(
-                f"Cannot connect to LLM service: {e}") from e
+            raise OllamaConnectionError(f"Cannot connect to LLM service: {e}") from e
 
         except APITimeoutError as e:
             tb = traceback.format_exc()
@@ -94,12 +95,10 @@ class NvidiaClient:
         """Generate text using the specified model."""
         try:
             model = model or self.default_model
-            logger.info(f"Sending request to LLM: model={
-                        model}, stream={stream}")
+            logger.info(f"Sending request to LLM: model={model}, stream={stream}")
 
             if stream:
-                raise OllamaException(
-                    "Use generate_stream() for streaming responses")
+                raise OllamaException("Use generate_stream() for streaming responses")
 
             completion = self.client.chat.completions.create(
                 model=model,
@@ -166,8 +165,7 @@ class NvidiaClient:
             model = model or self.default_model
 
             if use_structured_output:
-                prompt_data = self.prompt_builder.create_structured_prompt(
-                    query, chunks)
+                prompt_data = self.prompt_builder.create_structured_prompt(query, chunks)
                 prompt = prompt_data["prompt"]
 
                 response = self.generate(
@@ -190,8 +188,7 @@ class NvidiaClient:
             if response and "response" in response:
                 raw_response = response["response"]
                 logger.debug(f"Raw LLM response: {raw_response[:400]}")
-                parsed_response = self.response_parser.parse_structured_response(
-                    raw_response)
+                parsed_response = self.response_parser.parse_structured_response(raw_response)
 
                 # Ensure sources exist
                 if not parsed_response.get("sources"):
@@ -199,8 +196,7 @@ class NvidiaClient:
                     for chunk in chunks:
                         arxiv_id = chunk.get("arxiv_id")
                         if arxiv_id:
-                            clean_id = arxiv_id.split(
-                                "v")[0] if "v" in arxiv_id else arxiv_id
+                            clean_id = arxiv_id.split("v")[0] if "v" in arxiv_id else arxiv_id
                             pdf_url = f"https://arxiv.org/pdf/{clean_id}"
                             if pdf_url not in seen:
                                 sources.append(pdf_url)
@@ -209,10 +205,7 @@ class NvidiaClient:
 
                 # Add citations if missing
                 if not parsed_response.get("citations"):
-                    citations = list(
-                        set(chunk.get("arxiv_id")
-                            for chunk in chunks if chunk.get("arxiv_id"))
-                    )
+                    citations = list(set(chunk.get("arxiv_id") for chunk in chunks if chunk.get("arxiv_id")))
                     parsed_response["citations"] = citations[:5]
 
                 return parsed_response
@@ -244,8 +237,7 @@ class NvidiaClient:
 
         except Exception as e:
             logger.error(f"Error generating streaming RAG answer: {e}")
-            raise OllamaException(
-                f"Failed to generate streaming RAG answer: {e}")
+            raise OllamaException(f"Failed to generate streaming RAG answer: {e}")
 
     def generate_mindmap(self, paper_title, arxiv_id, chunks, model=None):
         try:
@@ -283,3 +275,69 @@ class NvidiaClient:
         except Exception as e:
             logger.error(f"Error generating mind map: {e}")
             raise OllamaException(f"Failed to generate mind map: {e}")
+
+    def generate_flashcards(
+        self,
+        paper_title: str,
+        paper_abstract: str,
+        chunks: list,
+        num_cards: int = 15,
+        topics: list[str] | None = None,
+        model: str | None = None,
+    ) -> dict[str, Any]:
+        """
+        Generate study flashcards for a research paper.
+
+        Args:
+            paper_title: Title of the paper
+            paper_abstract: Abstract text
+            chunks: List of text chunks from the paper
+            num_cards: Number of flashcards to generate (default: 15)
+            topics: Optional list of topics to focus on
+            model: Optional model override
+
+        Returns:
+            {"raw": str} - Raw JSON string from LLM
+
+        Raises:
+            OllamaConnectionError: If connection to LLM fails
+            OllamaTimeoutError: If request times out
+            OllamaException: For other LLM errors
+        """
+        try:
+            model = model or self.default_model
+
+            # Build the prompt using FlashcardPromptBuilder
+            # Note: Initialize flashcard_prompt_builder in __init__ like mindmap_prompt_builder
+            prompt = self.flashcard_prompt_builder.build_prompt(
+                paper_title=paper_title,
+                paper_abstract=paper_abstract,
+                chunks=chunks,
+                num_cards=num_cards,
+                topics=topics,
+            )
+
+            completion = self.client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.3,  # Lower temperature for more consistent flashcards
+                top_p=0.9,
+                max_tokens=4096,
+            )
+
+            raw_text = completion.choices[0].message.content
+
+            if not raw_text:
+                raise OllamaException("Empty response from LLM")
+
+            return {"raw": raw_text}
+
+        except OllamaConnectionError:
+            raise
+        except OllamaTimeoutError:
+            raise
+        except OllamaException:
+            raise
+        except Exception as e:
+            logger.error(f"Error generating flashcards: {e}")
+            raise OllamaException(f"Failed to generate flashcards: {e}")
