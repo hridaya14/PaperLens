@@ -1,14 +1,19 @@
 import json
 import logging
-from typing import Any, Dict, List, Optional, Generator
+import traceback
+from typing import Any, Dict, Generator, List, Optional
 
-from openai import OpenAI, APIConnectionError, APITimeoutError, OpenAIError
-
+from openai import APIConnectionError, APITimeoutError, OpenAI, OpenAIError
 from src.config import get_settings
 from src.exceptions import OllamaConnectionError, OllamaException, OllamaTimeoutError
 from src.schemas.nvidia import RAGResponse
-from src.services.nvidia.prompts import RAGPromptBuilder, ResponseParser, LLMResponse,UnstructuredResponse 
-import traceback
+from src.services.nvidia.prompts import (
+    FlashcardPromptBuilder,
+    MindMapPromptBuilder,
+    RAGPromptBuilder,
+    ResponseParser,
+    response_format,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -19,12 +24,11 @@ class NvidiaClient:
     def __init__(self):
         """Initialize OpenAI client with NVIDIA endpoint and API key."""
         settings = get_settings()
-        self.client = OpenAI(
-            api_key=settings.nvidia_api_key,
-            base_url=settings.nvidia_base_url
-        )
+        self.client = OpenAI(api_key=settings.nvidia_api_key, base_url=settings.nvidia_base_url)
         self.prompt_builder = RAGPromptBuilder()
         self.response_parser = ResponseParser()
+        self.mindmap_prompt_builder = MindMapPromptBuilder()
+        self.flashcard_prompt_builder = FlashcardPromptBuilder()
         self.timeout = float(settings.nvidia_timeout)
         self.default_model = "meta/llama-3.3-70b-instruct"
 
@@ -33,8 +37,7 @@ class NvidiaClient:
         try:
             logger.info("Performing NVIDIA LLM health check...")
             models = self.client.models.list()
-            logger.info(f"NVIDIA LLM endpoint reachable — {
-                        len(models.data)} models found.")
+            logger.info(f"NVIDIA LLM endpoint reachable — {len(models.data)} models found.")
             return {
                 "status": "healthy",
                 "message": "NVIDIA LLM endpoint reachable",
@@ -50,8 +53,7 @@ class NvidiaClient:
                 f"Details: {e}\n"
                 f"Traceback:\n{tb}"
             )
-            raise OllamaConnectionError(
-                f"Cannot connect to LLM service: {e}") from e
+            raise OllamaConnectionError(f"Cannot connect to LLM service: {e}") from e
 
         except APITimeoutError as e:
             tb = traceback.format_exc()
@@ -93,20 +95,17 @@ class NvidiaClient:
         """Generate text using the specified model."""
         try:
             model = model or self.default_model
-            logger.info(f"Sending request to LLM: model={
-                        model}, stream={stream}")
+            logger.info(f"Sending request to LLM: model={model}, stream={stream}")
 
             if stream:
-                raise OllamaException(
-                    "Use generate_stream() for streaming responses")
+                raise OllamaException("Use generate_stream() for streaming responses")
 
-            completion = self.client.chat.completions.parse(
+            completion = self.client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=kwargs.get("temperature", 0.7),
                 top_p=kwargs.get("top_p", 0.9),
                 max_tokens=kwargs.get("max_tokens", 2048),
-                response_format=kwargs.get("response_format",UnstructuredResponse)
             )
 
             return {"response": completion.choices[0].message.content}
@@ -166,8 +165,7 @@ class NvidiaClient:
             model = model or self.default_model
 
             if use_structured_output:
-                prompt_data = self.prompt_builder.create_structured_prompt(
-                    query, chunks)
+                prompt_data = self.prompt_builder.create_structured_prompt(query, chunks)
                 prompt = prompt_data["prompt"]
 
                 response = self.generate(
@@ -175,7 +173,7 @@ class NvidiaClient:
                     prompt=prompt,
                     temperature=0.7,
                     top_p=0.9,
-                    response_format=LLMResponse,
+                    response_format=response_format,
                 )
             else:
                 prompt = self.prompt_builder.create_rag_prompt(query, chunks)
@@ -184,51 +182,35 @@ class NvidiaClient:
                     prompt=prompt,
                     temperature=0.7,
                     top_p=0.9,
+                    response_format={"type": "json_object"},
                 )
 
-            # Response Validation
+            if response and "response" in response:
+                raw_response = response["response"]
+                logger.debug(f"Raw LLM response: {raw_response[:400]}")
+                parsed_response = self.response_parser.parse_structured_response(raw_response)
 
-            if not response or "response" not in response:
-                raise OllamaException("No response returned from LLM")
+                # Ensure sources exist
+                if not parsed_response.get("sources"):
+                    seen, sources = set(), []
+                    for chunk in chunks:
+                        arxiv_id = chunk.get("arxiv_id")
+                        if arxiv_id:
+                            clean_id = arxiv_id.split("v")[0] if "v" in arxiv_id else arxiv_id
+                            pdf_url = f"https://arxiv.org/pdf/{clean_id}"
+                            if pdf_url not in seen:
+                                sources.append(pdf_url)
+                                seen.add(pdf_url)
+                    parsed_response["sources"] = sources
 
-            parsed_response = response["response"].parsed
+                # Add citations if missing
+                if not parsed_response.get("citations"):
+                    citations = list(set(chunk.get("arxiv_id") for chunk in chunks if chunk.get("arxiv_id")))
+                    parsed_response["citations"] = citations[:5]
 
-            if not isinstance(parsed_response, dict):
-                raise OllamaException(
-                    f"Expected dict response, got {type(parsed_response)}"
-                )
+                return parsed_response
 
-            if "answer" not in parsed_response or not parsed_response["answer"]:
-                raise OllamaException("LLM response missing required 'answer' field")
-
-            # Normalizing Sources
-            if "sources" not in parsed_response or not parsed_response["sources"]:
-                seen, sources = set(), []
-                for chunk in chunks:
-                    arxiv_id = chunk.get("arxiv_id")
-                    if arxiv_id:
-                        clean_id = arxiv_id.split("v")[0]
-                        if clean_id not in seen:
-                            sources.append(clean_id)
-                            seen.add(clean_id)
-                parsed_response["sources"] = sources
-
-            # Normalize Citations
-            if "citations" not in parsed_response or not parsed_response["citations"]:
-                parsed_response["citations"] = [
-                    f"[arXiv:{src}]" for src in parsed_response["sources"]
-                ]
-
-            # Handle missing confidence
-            if "confidence" not in parsed_response:
-                parsed_response["confidence"] = "medium"
-
-            return {
-            "answer": parsed_response["answer"],
-            "sources": parsed_response["sources"],
-            "citations": parsed_response["citations"],
-            "confidence": parsed_response["confidence"],
-            }
+            raise OllamaException("No structured response generated from LLM")
 
         except Exception as e:
             logger.error(f"Error generating RAG answer: {e}")
@@ -255,6 +237,107 @@ class NvidiaClient:
 
         except Exception as e:
             logger.error(f"Error generating streaming RAG answer: {e}")
-            raise OllamaException(
-                f"Failed to generate streaming RAG answer: {e}")
+            raise OllamaException(f"Failed to generate streaming RAG answer: {e}")
 
+    def generate_mindmap(self, paper_title, arxiv_id, chunks, model=None):
+        try:
+            model = model or self.default_model
+
+            prompt = self.mindmap_prompt_builder.build_prompt(
+                paper_title=paper_title,
+                arxiv_id=arxiv_id,
+                chunks=chunks,
+            )
+
+            # Call completions directly without UnstructuredResponse wrapper
+            # so the LLM outputs raw JSON without being forced into {"answer": "..."}
+            completion = self.client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.3,
+                top_p=0.9,
+                max_tokens=4096,
+            )
+
+            raw_text = completion.choices[0].message.content
+
+            if not raw_text:
+                raise OllamaException("Empty response from LLM")
+
+            return {"raw": raw_text}
+
+        except OllamaConnectionError:
+            raise
+        except OllamaTimeoutError:
+            raise
+        except OllamaException:
+            raise
+        except Exception as e:
+            logger.error(f"Error generating mind map: {e}")
+            raise OllamaException(f"Failed to generate mind map: {e}")
+
+    def generate_flashcards(
+        self,
+        paper_title: str,
+        paper_abstract: str,
+        chunks: list,
+        num_cards: int = 15,
+        topics: list[str] | None = None,
+        model: str | None = None,
+    ) -> dict[str, Any]:
+        """
+        Generate study flashcards for a research paper.
+
+        Args:
+            paper_title: Title of the paper
+            paper_abstract: Abstract text
+            chunks: List of text chunks from the paper
+            num_cards: Number of flashcards to generate (default: 15)
+            topics: Optional list of topics to focus on
+            model: Optional model override
+
+        Returns:
+            {"raw": str} - Raw JSON string from LLM
+
+        Raises:
+            OllamaConnectionError: If connection to LLM fails
+            OllamaTimeoutError: If request times out
+            OllamaException: For other LLM errors
+        """
+        try:
+            model = model or self.default_model
+
+            # Build the prompt using FlashcardPromptBuilder
+            # Note: Initialize flashcard_prompt_builder in __init__ like mindmap_prompt_builder
+            prompt = self.flashcard_prompt_builder.build_prompt(
+                paper_title=paper_title,
+                paper_abstract=paper_abstract,
+                chunks=chunks,
+                num_cards=num_cards,
+                topics=topics,
+            )
+
+            completion = self.client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.3,  # Lower temperature for more consistent flashcards
+                top_p=0.9,
+                max_tokens=4096,
+            )
+
+            raw_text = completion.choices[0].message.content
+
+            if not raw_text:
+                raise OllamaException("Empty response from LLM")
+
+            return {"raw": raw_text}
+
+        except OllamaConnectionError:
+            raise
+        except OllamaTimeoutError:
+            raise
+        except OllamaException:
+            raise
+        except Exception as e:
+            logger.error(f"Error generating flashcards: {e}")
+            raise OllamaException(f"Failed to generate flashcards: {e}")
