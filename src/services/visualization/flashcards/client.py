@@ -221,7 +221,7 @@ class FlashcardService:
         flashcards = [
             Flashcard(
                 id=fc.id,
-                paper_id=fc.paper_id,
+                paper_id=str(fc.paper_id),
                 front=fc.front,
                 back=fc.back,
                 topic=fc.topic,
@@ -234,7 +234,7 @@ class FlashcardService:
 
         # Build FlashcardSet
         flashcard_set = FlashcardSet(
-            paper_id=metadata.paper_id,
+            paper_id=str(metadata.paper_id),
             arxiv_id=metadata.arxiv_id,
             paper_title=metadata.paper_title,
             flashcards=flashcards,
@@ -288,7 +288,7 @@ class FlashcardService:
         flashcards_with_ids = [
             Flashcard(
                 id=fc.id,
-                paper_id=fc.paper_id,
+                paper_id=str(fc.paper_id),
                 front=fc.front,
                 back=fc.back,
                 topic=fc.topic,
