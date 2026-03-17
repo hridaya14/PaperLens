@@ -181,3 +181,7 @@ test_data/
 
 
 
+
+# Track Next.js frontend source helpers
+!/new-frontend/lib/
+!/new-frontend/lib/**

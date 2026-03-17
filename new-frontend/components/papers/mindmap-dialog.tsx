@@ -152,6 +152,9 @@ export function MindMapDialog({ paper, open, onOpenChange }: MindMapDialogProps)
                   nodeTypes={nodeTypes}
                   onNodesChange={onNodesChange}
                   onEdgesChange={onEdgesChange}
+                  nodesDraggable
+                  nodesConnectable={false}
+                  elementsSelectable
                   fitView
                   fitViewOptions={{ padding: 0.28 }}
                   minZoom={0.16}
