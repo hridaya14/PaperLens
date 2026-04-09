@@ -3,14 +3,26 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
-import { BookOpenText, Filter, LibraryBig, Search, Sparkles } from "lucide-react";
+import {
+  BookOpenText,
+  Filter,
+  LibraryBig,
+  Search,
+  Sparkles,
+} from "lucide-react";
 import { getPapers } from "@/lib/api/client";
 import { AVAILABLE_CATEGORIES, RESULT_LIMITS } from "@/lib/constants";
 import { loadBookmarks, saveBookmarks, toggleBookmark } from "@/lib/bookmarks";
 import type { Paper } from "@/lib/schemas";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -24,6 +36,7 @@ type SearchFilters = {
   query: string;
   categories: string[];
   pdfProcessed: boolean | null;
+  source: string;
   limit: number;
 };
 
@@ -31,12 +44,15 @@ const defaultFilters: SearchFilters = {
   query: "",
   categories: [],
   pdfProcessed: null,
-  limit: 20
+  source: "any",
+  limit: 20,
 };
 
 export function PapersWorkspace() {
-  const [draftFilters, setDraftFilters] = useState<SearchFilters>(defaultFilters);
-  const [activeFilters, setActiveFilters] = useState<SearchFilters>(defaultFilters);
+  const [draftFilters, setDraftFilters] =
+    useState<SearchFilters>(defaultFilters);
+  const [activeFilters, setActiveFilters] =
+    useState<SearchFilters>(defaultFilters);
   const [bookmarks, setBookmarks] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<"all" | "bookmarked">("all");
   const [pdfPaper, setPdfPaper] = useState<Paper | null>(null);
@@ -58,13 +74,18 @@ export function PapersWorkspace() {
         query: activeFilters.query || undefined,
         categories: activeFilters.categories,
         pdfProcessed: activeFilters.pdfProcessed,
+        source:
+          activeFilters.source === "any" ? undefined : activeFilters.source,
         limit: activeFilters.limit,
-        offset: 0
-      })
+        offset: 0,
+      }),
   });
 
   const papers = papersQuery.data?.papers ?? [];
-  const visiblePapers = activeTab === "all" ? papers : papers.filter((paper) => bookmarks.includes(paper.id));
+  const visiblePapers =
+    activeTab === "all"
+      ? papers
+      : papers.filter((paper) => bookmarks.includes(paper.id));
 
   function applyFilters() {
     setActiveFilters(draftFilters);
@@ -84,7 +105,12 @@ export function PapersWorkspace() {
             id="query"
             placeholder="Transformers, multimodal systems, retrieval..."
             value={draftFilters.query}
-            onChange={(event) => setDraftFilters((current) => ({ ...current, query: event.target.value }))}
+            onChange={(event) =>
+              setDraftFilters((current) => ({
+                ...current,
+                query: event.target.value,
+              }))
+            }
             className="mt-2"
           />
         </div>
@@ -102,8 +128,10 @@ export function PapersWorkspace() {
                     setDraftFilters((current) => ({
                       ...current,
                       categories: active
-                        ? current.categories.filter((value) => value !== category.value)
-                        : [...current.categories, category.value]
+                        ? current.categories.filter(
+                            (value) => value !== category.value,
+                          )
+                        : [...current.categories, category.value],
                     }))
                   }
                   className={`rounded-full border px-3 py-2 text-sm transition ${
@@ -119,11 +147,19 @@ export function PapersWorkspace() {
           </div>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <label className="space-y-2">
-            <span className="block text-sm font-medium text-foreground">PDF status</span>
+            <span className="block text-sm font-medium text-foreground">
+              PDF status
+            </span>
             <select
-              value={draftFilters.pdfProcessed === null ? "any" : draftFilters.pdfProcessed ? "processed" : "pending"}
+              value={
+                draftFilters.pdfProcessed === null
+                  ? "any"
+                  : draftFilters.pdfProcessed
+                    ? "processed"
+                    : "pending"
+              }
               onChange={(event) =>
                 setDraftFilters((current) => ({
                   ...current,
@@ -131,8 +167,8 @@ export function PapersWorkspace() {
                     event.target.value === "processed"
                       ? true
                       : event.target.value === "pending"
-                      ? false
-                        : null
+                        ? false
+                        : null,
                 }))
               }
               className="field-surface h-12 w-full appearance-none rounded-2xl px-4 text-sm outline-none focus:ring-2 focus:ring-ring"
@@ -144,10 +180,37 @@ export function PapersWorkspace() {
           </label>
 
           <label className="space-y-2">
-            <span className="block text-sm font-medium text-foreground">Results per page</span>
+            <span className="block text-sm font-medium text-foreground">
+              Source
+            </span>
+            <select
+              value={draftFilters.source}
+              onChange={(event) =>
+                setDraftFilters((current) => ({
+                  ...current,
+                  source: event.target.value,
+                }))
+              }
+              className="field-surface h-12 w-full appearance-none rounded-2xl px-4 text-sm outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="any">Any</option>
+              <option value="arxiv">arXiv</option>
+              <option value="user_upload">User uploads</option>
+            </select>
+          </label>
+
+          <label className="space-y-2">
+            <span className="block text-sm font-medium text-foreground">
+              Results per page
+            </span>
             <select
               value={draftFilters.limit}
-              onChange={(event) => setDraftFilters((current) => ({ ...current, limit: Number(event.target.value) }))}
+              onChange={(event) =>
+                setDraftFilters((current) => ({
+                  ...current,
+                  limit: Number(event.target.value),
+                }))
+              }
               className="field-surface h-12 w-full appearance-none rounded-2xl px-4 text-sm outline-none focus:ring-2 focus:ring-ring"
             >
               {RESULT_LIMITS.map((limit) => (
@@ -178,9 +241,13 @@ export function PapersWorkspace() {
         <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
             <div className="eyebrow mb-4">Research shelf</div>
-            <h1 className="font-serif text-5xl font-semibold tracking-tight text-foreground">Browse, read, and study your ingested papers.</h1>
+            <h1 className="font-serif text-5xl font-semibold tracking-tight text-foreground">
+              Browse, read, and study your ingested papers.
+            </h1>
             <p className="mt-4 text-lg leading-8 text-muted-foreground">
-              This workspace mirrors the Streamlit prototype while adding a more deliberate reading environment for PDFs, mind maps, and flashcard review.
+              This workspace mirrors the Streamlit prototype while adding a more
+              deliberate reading environment for PDFs, mind maps, and flashcard
+              review.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
@@ -195,8 +262,13 @@ export function PapersWorkspace() {
               </SheetTrigger>
               <SheetContent side="right">
                 <div className="space-y-2">
-                  <h2 className="font-serif text-3xl font-semibold">Search & Filters</h2>
-                  <p className="text-sm text-muted-foreground">Adjust the same search controls from the prototype, optimized for mobile.</p>
+                  <h2 className="font-serif text-3xl font-semibold">
+                    Search & Filters
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    Adjust the same search controls from the prototype,
+                    optimized for mobile.
+                  </p>
                 </div>
                 {renderFilters()}
               </SheetContent>
@@ -209,7 +281,10 @@ export function PapersWorkspace() {
             <Card className="sticky top-28">
               <CardHeader>
                 <CardTitle>Search & Filters</CardTitle>
-                <CardDescription>Start with the newest papers, then narrow by category or PDF processing status.</CardDescription>
+                <CardDescription>
+                  Start with the newest papers, then narrow by category or PDF
+                  processing status.
+                </CardDescription>
               </CardHeader>
               <CardContent>{renderFilters()}</CardContent>
             </Card>
@@ -223,7 +298,9 @@ export function PapersWorkspace() {
                     type="button"
                     onClick={() => setActiveTab("all")}
                     className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                      activeTab === "all" ? "bg-white/10 text-white" : "bg-white/5 text-white/62"
+                      activeTab === "all"
+                        ? "bg-white/10 text-white"
+                        : "bg-white/5 text-white/62"
                     }`}
                   >
                     All Papers
@@ -232,7 +309,9 @@ export function PapersWorkspace() {
                     type="button"
                     onClick={() => setActiveTab("bookmarked")}
                     className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                      activeTab === "bookmarked" ? "bg-white/10 text-white" : "bg-white/5 text-white/62"
+                      activeTab === "bookmarked"
+                        ? "bg-white/10 text-white"
+                        : "bg-white/5 text-white/62"
                     }`}
                   >
                     Bookmarked
@@ -273,9 +352,13 @@ export function PapersWorkspace() {
             ) : papersQuery.isError ? (
               <Card>
                 <CardContent className="p-8 text-center">
-                  <p className="text-lg font-medium text-foreground">Unable to load papers.</p>
+                  <p className="text-lg font-medium text-foreground">
+                    Unable to load papers.
+                  </p>
                   <p className="mt-2 text-sm text-muted-foreground">
-                    {papersQuery.error instanceof Error ? papersQuery.error.message : "Unexpected error"}
+                    {papersQuery.error instanceof Error
+                      ? papersQuery.error.message
+                      : "Unexpected error"}
                   </p>
                 </CardContent>
               </Card>
@@ -287,7 +370,11 @@ export function PapersWorkspace() {
                       key={paper.id}
                       paper={paper}
                       bookmarked={bookmarks.includes(paper.id)}
-                      onToggleBookmark={(paperId) => setBookmarks((current) => toggleBookmark(current, paperId))}
+                      onToggleBookmark={(paperId) =>
+                        setBookmarks((current) =>
+                          toggleBookmark(current, paperId),
+                        )
+                      }
                       onOpenPdf={setPdfPaper}
                       onOpenMindMap={setMindMapPaper}
                       onOpenFlashcards={setFlashcardPaper}
@@ -299,9 +386,12 @@ export function PapersWorkspace() {
               <Card>
                 <CardContent className="flex flex-col items-center justify-center gap-4 p-10 text-center">
                   <Sparkles className="h-10 w-10 text-paper-500" />
-                  <p className="font-serif text-3xl font-semibold">No papers to show.</p>
+                  <p className="font-serif text-3xl font-semibold">
+                    No papers to show.
+                  </p>
                   <p className="max-w-lg text-sm leading-6 text-muted-foreground">
-                    Try widening your filters, or switch back to All Papers if the current bookmarked view is empty for this search.
+                    Try widening your filters, or switch back to All Papers if
+                    the current bookmarked view is empty for this search.
                   </p>
                 </CardContent>
               </Card>
@@ -310,9 +400,21 @@ export function PapersWorkspace() {
         </div>
       </section>
 
-      <PdfDialog paper={pdfPaper} open={Boolean(pdfPaper)} onOpenChange={(open) => !open && setPdfPaper(null)} />
-      <MindMapDialog paper={mindMapPaper} open={Boolean(mindMapPaper)} onOpenChange={(open) => !open && setMindMapPaper(null)} />
-      <FlashcardDialog paper={flashcardPaper} open={Boolean(flashcardPaper)} onOpenChange={(open) => !open && setFlashcardPaper(null)} />
+      <PdfDialog
+        paper={pdfPaper}
+        open={Boolean(pdfPaper)}
+        onOpenChange={(open) => !open && setPdfPaper(null)}
+      />
+      <MindMapDialog
+        paper={mindMapPaper}
+        open={Boolean(mindMapPaper)}
+        onOpenChange={(open) => !open && setMindMapPaper(null)}
+      />
+      <FlashcardDialog
+        paper={flashcardPaper}
+        open={Boolean(flashcardPaper)}
+        onOpenChange={(open) => !open && setFlashcardPaper(null)}
+      />
     </>
   );
 }

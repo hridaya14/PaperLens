@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from src.config import get_settings
 from src.db.factory import make_database
 from src.db.redis.redis import get_redis_client
-from src.routers import hybrid_search, papers, ping, visualization
+from src.routers import hybrid_search, papers, ping, uploads, visualization
 from src.routers.ask import ask_router, stream_router
 from src.services.arxiv.factory import make_arxiv_client
 from src.services.embeddings.factory import make_embeddings_service
@@ -95,6 +95,7 @@ app = FastAPI(
 # Routers
 app.include_router(ping.router, prefix="/api/v1")  # Health check endpoint
 app.include_router(papers.router, prefix="/api/v1")
+app.include_router(uploads.router, prefix="/api/v1")
 # Search chunks with BM25/hybrid
 app.include_router(hybrid_search.router, prefix="/api/v1")
 

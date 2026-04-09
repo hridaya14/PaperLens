@@ -2,6 +2,7 @@ import logging
 from typing import Dict, List, Optional
 
 from src.services.embeddings.jina_client import JinaEmbeddingsClient
+from src.services.embeddings.nvidia_client import NIMEmbeddingsClient
 from src.services.opensearch.client import OpenSearchClient
 
 from .text_chunker import TextChunker
@@ -18,7 +19,7 @@ class HybridIndexingService:
     3. Indexing chunks with embeddings into OpenSearch
     """
 
-    def __init__(self, chunker: TextChunker, embeddings_client: JinaEmbeddingsClient, opensearch_client: OpenSearchClient):
+    def __init__(self, chunker: TextChunker, embeddings_client: NIMEmbeddingsClient, opensearch_client: OpenSearchClient):
         """Initialize hybrid indexing service.
 
         :param chunker: Text chunking service
@@ -34,14 +35,24 @@ class HybridIndexingService:
     async def index_paper(self, paper_data: Dict) -> Dict[str, int]:
         """Index a single paper with chunking and embeddings.
 
+        Supports both ArXiv papers (have arxiv_id) and user uploads (arxiv_id
+        is None).  For user uploads, str(paper.id) is used as the document
+        identifier so all existing OpenSearch logic stays unchanged.
+
         :param paper_data: Paper data from database
         :returns: Dictionary with indexing statistics
         """
         arxiv_id = paper_data.get("arxiv_id")
         paper_id = str(paper_data.get("id", ""))
 
-        if not arxiv_id:
-            logger.error("Paper missing arxiv_id")
+        # --- CHANGED: relax the hard gate on arxiv_id ---
+        # Previously this returned early if arxiv_id was missing.
+        # User-uploaded papers have no arxiv_id, so we fall back to paper_id
+        # as the document identifier used throughout OpenSearch.
+        doc_identifier = arxiv_id or paper_id
+
+        if not doc_identifier:
+            logger.error("Paper missing both arxiv_id and id — cannot index")
             return {"chunks_created": 0, "chunks_indexed": 0, "embeddings_generated": 0, "errors": 1}
 
         try:
@@ -50,22 +61,24 @@ class HybridIndexingService:
                 title=paper_data.get("title", ""),
                 abstract=paper_data.get("abstract", ""),
                 full_text=paper_data.get("raw_text", paper_data.get("full_text", "")),
-                arxiv_id=arxiv_id,
+                # Pass doc_identifier as arxiv_id so chunk metadata is populated
+                # consistently regardless of paper source.
+                arxiv_id=doc_identifier,
                 paper_id=paper_id,
                 sections=paper_data.get("sections"),
             )
 
             if not chunks:
-                logger.warning(f"No chunks created for paper {arxiv_id}")
+                logger.warning(f"No chunks created for paper {doc_identifier}")
                 return {"chunks_created": 0, "chunks_indexed": 0, "embeddings_generated": 0, "errors": 0}
 
-            logger.info(f"Created {len(chunks)} chunks for paper {arxiv_id}")
+            logger.info(f"Created {len(chunks)} chunks for paper {doc_identifier}")
 
             # Step 2: Generate embeddings for chunks
             chunk_texts = [chunk.text for chunk in chunks]
             embeddings = await self.embeddings_client.embed_passages(
                 texts=chunk_texts,
-                batch_size=50,  # Process in batches
+                batch_size=50,
             )
 
             if len(embeddings) != len(chunks):
@@ -76,9 +89,8 @@ class HybridIndexingService:
             chunks_with_embeddings = []
 
             for chunk, embedding in zip(chunks, embeddings):
-                # Prepare chunk data for OpenSearch
                 chunk_data = {
-                    "arxiv_id": chunk.arxiv_id,
+                    "arxiv_id": chunk.arxiv_id,  # holds doc_identifier for uploads
                     "paper_id": chunk.paper_id,
                     "chunk_index": chunk.metadata.chunk_index,
                     "chunk_text": chunk.text,
@@ -102,7 +114,7 @@ class HybridIndexingService:
             # Step 4: Index chunks into OpenSearch
             results = self.opensearch_client.bulk_index_chunks(chunks_with_embeddings)
 
-            logger.info(f"Indexed paper {arxiv_id}: {results['success']} chunks successful, {results['failed']} failed")
+            logger.info(f"Indexed paper {doc_identifier}: {results['success']} chunks successful, {results['failed']} failed")
 
             return {
                 "chunks_created": len(chunks),
@@ -112,7 +124,7 @@ class HybridIndexingService:
             }
 
         except Exception as e:
-            logger.error(f"Error indexing paper {arxiv_id}: {e}")
+            logger.error(f"Error indexing paper {doc_identifier}: {e}")
             return {"chunks_created": 0, "chunks_indexed": 0, "embeddings_generated": 0, "errors": 1}
 
     async def index_papers_batch(self, papers: List[Dict], replace_existing: bool = False) -> Dict[str, int]:
@@ -133,14 +145,11 @@ class HybridIndexingService:
         for paper in papers:
             arxiv_id = paper.get("arxiv_id")
 
-            # Optionally delete existing chunks
             if replace_existing and arxiv_id:
                 self.opensearch_client.delete_paper_chunks(arxiv_id)
 
-            # Index the paper
             stats = await self.index_paper(paper)
 
-            # Update totals
             total_stats["papers_processed"] += 1
             total_stats["total_chunks_created"] += stats["chunks_created"]
             total_stats["total_chunks_indexed"] += stats["chunks_indexed"]
@@ -157,14 +166,12 @@ class HybridIndexingService:
     async def reindex_paper(self, arxiv_id: str, paper_data: Dict) -> Dict[str, int]:
         """Reindex a paper by deleting old chunks and creating new ones.
 
-        :param arxiv_id: ArXiv ID of the paper
+        :param arxiv_id: ArXiv ID of the paper (or paper UUID for user uploads)
         :param paper_data: Updated paper data
         :returns: Indexing statistics
         """
-        # Delete existing chunks
         deleted = self.opensearch_client.delete_paper_chunks(arxiv_id)
         if deleted:
             logger.info(f"Deleted existing chunks for paper {arxiv_id}")
 
-        # Index with new data
         return await self.index_paper(paper_data)

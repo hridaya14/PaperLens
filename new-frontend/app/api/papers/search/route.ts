@@ -7,6 +7,7 @@ export async function GET(request: NextRequest) {
     const q = searchParams.get("q");
     const categories = searchParams.getAll("categories");
     const pdfProcessed = parseBoolean(searchParams.get("pdf_processed"));
+    const source = searchParams.get("source");
     const limit = parseNumber(searchParams.get("limit"), 20);
     const offset = parseNumber(searchParams.get("offset"), 0);
 
@@ -14,8 +15,9 @@ export async function GET(request: NextRequest) {
       query: q,
       categories: categories.length ? categories : null,
       pdfProcessed,
+      source,
       limit,
-      offset
+      offset,
     });
 
     return NextResponse.json(papers);
@@ -43,6 +45,7 @@ function parseNumber(value: string | null, fallback: number) {
 }
 
 function toErrorResponse(error: unknown) {
-  const message = error instanceof Error ? error.message : "Unexpected proxy error";
+  const message =
+    error instanceof Error ? error.message : "Unexpected proxy error";
   return NextResponse.json({ error: message }, { status: 500 });
 }

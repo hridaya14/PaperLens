@@ -35,6 +35,7 @@ def search_papers(
     pdf_processed: Optional[bool] = None,
     published_after: Optional[datetime] = None,
     published_before: Optional[datetime] = None,
+    source: Optional[str] = None,
     limit: int = 20,
     offset: int = 0,
 ) -> PaperSearchResponse:
@@ -44,15 +45,16 @@ def search_papers(
         pdf_processed=pdf_processed,
         published_after=published_after,
         published_before=published_before,
+        source=source,
     )
 
     repo = PaperRepository(db)
-    papers = repo.search(filters, limit, offset)
-    # Get total count for pagination info
-    total = repo.get_count()
+    papers, total = repo.search(filters, limit, offset)
 
-    return PaperSearchResponse(papers=[PaperResponse.model_validate(paper) for paper in papers], total=total)
-
+    return PaperSearchResponse(
+        papers=[PaperResponse.model_validate(paper) for paper in papers],
+        total=total,
+    )
 
 @router.get("/{arxiv_id}", response_model=PaperResponse)
 def get_paper_details(

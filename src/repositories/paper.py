@@ -78,7 +78,7 @@ class PaperRepository:
         # ---- Pagination ----
         stmt = stmt.limit(limit).offset(offset)
 
-        return list(self.session.scalars(stmt))
+        return list(self.session.scalars(stmt)), total
 
     def get_count(self) -> int:
         stmt = select(func.count(Paper.id))
@@ -145,3 +145,14 @@ class PaperRepository:
         else:
             # Create new paper
             return self.create(paper_create)
+
+    def delete(self, paper: Paper) -> None:
+        """Hard-delete a paper record from Postgres.
+     
+            Caller is responsible for cleaning up OpenSearch chunks and
+            any files on disk before calling this.
+         
+            :param paper: Paper ORM instance to delete
+        """
+        self.session.delete(paper)
+        self.session.commit()

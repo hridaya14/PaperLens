@@ -20,7 +20,9 @@ class ArxivPaper(BaseModel):
 
 class PaperBase(BaseModel):
     # Core arXiv metadata
-    arxiv_id: str = Field(..., description="arXiv paper ID")
+    arxiv_id: Optional[str] = Field(
+        None, description="arXiv paper ID (null for user uploads)"
+    )  
     title: str = Field(..., description="Paper title")
     authors: List[str] = Field(..., description="List of author names")
     abstract: str = Field(..., description="Paper abstract")
@@ -89,6 +91,7 @@ class PaperSearchFilters(BaseModel):
     pdf_processed: Optional[bool] = None
     published_after: Optional[datetime] = None
     published_before: Optional[datetime] = None
+    source: Optional[str] = None
 
 
 class PaperSearchResponse(BaseModel):

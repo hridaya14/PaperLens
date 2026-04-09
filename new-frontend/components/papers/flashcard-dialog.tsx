@@ -8,7 +8,13 @@ import type { Paper } from "@/lib/schemas";
 import { getFlashcards } from "@/lib/api/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 type FlashcardDialogProps = {
   paper: Paper | null;
@@ -16,11 +22,21 @@ type FlashcardDialogProps = {
   onOpenChange: (open: boolean) => void;
 };
 
-export function FlashcardDialog({ paper, open, onOpenChange }: FlashcardDialogProps) {
+export function FlashcardDialog({
+  paper,
+  open,
+  onOpenChange,
+}: FlashcardDialogProps) {
+  const arxivId = paper?.arxiv_id ?? null;
   const flashcardQuery = useQuery({
-    queryKey: ["flashcards", paper?.arxiv_id],
-    queryFn: () => getFlashcards(paper!.arxiv_id, { numCards: 15 }),
-    enabled: open && Boolean(paper?.arxiv_id)
+    queryKey: ["flashcards", arxivId],
+    queryFn: () => {
+      if (!arxivId) {
+        return Promise.reject(new Error("Missing arXiv ID"));
+      }
+      return getFlashcards(arxivId, { numCards: 15 });
+    },
+    enabled: open && Boolean(arxivId),
   });
 
   const [cards, setCards] = useState<ReturnType<typeof getCardList>>([]);
@@ -42,12 +58,25 @@ export function FlashcardDialog({ paper, open, onOpenChange }: FlashcardDialogPr
 
   const availableTopics = [
     "All",
-    ...Array.from(new Set(cards.map((card) => card.topic).filter((topic): topic is string => Boolean(topic))))
+    ...Array.from(
+      new Set(
+        cards
+          .map((card) => card.topic)
+          .filter((topic): topic is string => Boolean(topic)),
+      ),
+    ),
   ];
-  const visibleCards = topicFilter === "All" ? cards : cards.filter((card) => card.topic === topicFilter);
+  const visibleCards =
+    topicFilter === "All"
+      ? cards
+      : cards.filter((card) => card.topic === topicFilter);
   const currentCard = visibleCards[index] ?? null;
-  const progress = visibleCards.length ? Math.min(index + 1, visibleCards.length) : 0;
-  const studiedCount = studied.filter((cardId) => visibleCards.some((card) => card.id === cardId)).length;
+  const progress = visibleCards.length
+    ? Math.min(index + 1, visibleCards.length)
+    : 0;
+  const studiedCount = studied.filter((cardId) =>
+    visibleCards.some((card) => card.id === cardId),
+  ).length;
 
   useEffect(() => {
     setIndex(0);
@@ -55,7 +84,9 @@ export function FlashcardDialog({ paper, open, onOpenChange }: FlashcardDialogPr
   }, [topicFilter]);
 
   function markStudied(cardId: string) {
-    setStudied((current) => (current.includes(cardId) ? current : [...current, cardId]));
+    setStudied((current) =>
+      current.includes(cardId) ? current : [...current, cardId],
+    );
   }
 
   return (
@@ -63,24 +94,38 @@ export function FlashcardDialog({ paper, open, onOpenChange }: FlashcardDialogPr
       <DialogContent className="panel-dark max-w-5xl overflow-hidden border-white/10 bg-[linear-gradient(180deg,#101817,#182321)] p-0 text-white">
         <DialogHeader className="border-b border-white/10 px-8 py-6">
           <div className="mb-3 flex items-center gap-3">
-            <div className="eyebrow border-white/10 bg-white/5 text-paper-100">Study mode</div>
-            {flashcardQuery.data?.meta?.is_cached ? <Badge variant="dark">Cached set</Badge> : null}
+            <div className="eyebrow border-white/10 bg-white/5 text-paper-100">
+              Study mode
+            </div>
+            {flashcardQuery.data?.meta?.is_cached ? (
+              <Badge variant="dark">Cached set</Badge>
+            ) : null}
           </div>
-          <DialogTitle className="text-white">{paper?.title ?? "Flashcards"}</DialogTitle>
+          <DialogTitle className="text-white">
+            {paper?.title ?? "Flashcards"}
+          </DialogTitle>
           <DialogDescription className="text-white/68">
-            Notebook-style flashcards generated from indexed sections. Flip cards, shuffle the deck, and focus by topic.
+            Notebook-style flashcards generated from indexed sections. Flip
+            cards, shuffle the deck, and focus by topic.
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-6 p-8 lg:grid-cols-[1.15fr_0.6fr]">
           <div className="space-y-5">
-            {flashcardQuery.isLoading ? (
+            {!paper?.arxiv_id ? (
+              <div className="flex min-h-[420px] items-center justify-center rounded-[30px] border border-white/10 bg-white/5 px-6 text-center text-sm text-white/70">
+                Flashcards are only available for arXiv-sourced papers right
+                now. Uploads can still be read in the PDF viewer.
+              </div>
+            ) : flashcardQuery.isLoading ? (
               <div className="flex min-h-[420px] items-center justify-center rounded-[30px] border border-white/10 bg-white/5 text-sm text-white/70">
                 Generating flashcards. First load can take a little while.
               </div>
             ) : flashcardQuery.isError ? (
               <div className="flex min-h-[420px] items-center justify-center rounded-[30px] border border-rose-400/20 bg-rose-500/10 px-6 text-center text-sm text-rose-100">
-                {flashcardQuery.error instanceof Error ? flashcardQuery.error.message : "Unable to load flashcards."}
+                {flashcardQuery.error instanceof Error
+                  ? flashcardQuery.error.message
+                  : "Unable to load flashcards."}
               </div>
             ) : currentCard ? (
               <>
@@ -91,7 +136,12 @@ export function FlashcardDialog({ paper, open, onOpenChange }: FlashcardDialogPr
                   <p>{studiedCount} reviewed</p>
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-white/10">
-                  <div className="h-full rounded-full bg-gradient-to-r from-paper-300 via-paper-400 to-orange-400" style={{ width: `${visibleCards.length ? (progress / visibleCards.length) * 100 : 0}%` }} />
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-paper-300 via-paper-400 to-orange-400"
+                    style={{
+                      width: `${visibleCards.length ? (progress / visibleCards.length) * 100 : 0}%`,
+                    }}
+                  />
                 </div>
                 <AnimatePresence mode="wait">
                   <motion.div
@@ -107,10 +157,16 @@ export function FlashcardDialog({ paper, open, onOpenChange }: FlashcardDialogPr
                     }`}
                   >
                     <div className="mb-8 flex items-center justify-between gap-4">
-                      <Badge variant="dark">{showAnswer ? "Answer" : "Question"}</Badge>
+                      <Badge variant="dark">
+                        {showAnswer ? "Answer" : "Question"}
+                      </Badge>
                       <div className="flex gap-2">
-                        {currentCard.topic ? <Badge variant="dark">{currentCard.topic}</Badge> : null}
-                        {currentCard.difficulty ? <Badge variant="dark">{currentCard.difficulty}</Badge> : null}
+                        {currentCard.topic ? (
+                          <Badge variant="dark">{currentCard.topic}</Badge>
+                        ) : null}
+                        {currentCard.difficulty ? (
+                          <Badge variant="dark">{currentCard.difficulty}</Badge>
+                        ) : null}
                       </div>
                     </div>
                     <div className="flex min-h-[240px] items-center justify-center">
@@ -121,24 +177,38 @@ export function FlashcardDialog({ paper, open, onOpenChange }: FlashcardDialogPr
                   </motion.div>
                 </AnimatePresence>
                 <div className="grid gap-3 sm:grid-cols-3">
-                  <Button variant="outline" className="border-white/15 bg-white/5 text-white hover:bg-white/10" disabled={index === 0} onClick={() => {
-                    setIndex((current) => Math.max(0, current - 1));
-                    setShowAnswer(false);
-                  }}>
+                  <Button
+                    variant="outline"
+                    className="border-white/15 bg-white/5 text-white hover:bg-white/10"
+                    disabled={index === 0}
+                    onClick={() => {
+                      setIndex((current) => Math.max(0, current - 1));
+                      setShowAnswer(false);
+                    }}
+                  >
                     Previous
                   </Button>
-                  <Button onClick={() => {
-                    setShowAnswer((current) => !current);
-                    if (!showAnswer) {
-                      markStudied(currentCard.id);
-                    }
-                  }}>
+                  <Button
+                    onClick={() => {
+                      setShowAnswer((current) => !current);
+                      if (!showAnswer) {
+                        markStudied(currentCard.id);
+                      }
+                    }}
+                  >
                     {showAnswer ? "Show Question" : "Show Answer"}
                   </Button>
-                  <Button variant="outline" className="border-white/15 bg-white/5 text-white hover:bg-white/10" disabled={index >= visibleCards.length - 1} onClick={() => {
-                    setIndex((current) => Math.min(visibleCards.length - 1, current + 1));
-                    setShowAnswer(false);
-                  }}>
+                  <Button
+                    variant="outline"
+                    className="border-white/15 bg-white/5 text-white hover:bg-white/10"
+                    disabled={index >= visibleCards.length - 1}
+                    onClick={() => {
+                      setIndex((current) =>
+                        Math.min(visibleCards.length - 1, current + 1),
+                      );
+                      setShowAnswer(false);
+                    }}
+                  >
                     Next
                   </Button>
                 </div>
@@ -164,7 +234,11 @@ export function FlashcardDialog({ paper, open, onOpenChange }: FlashcardDialogPr
                   className="field-surface h-12 w-full appearance-none rounded-2xl px-4 text-sm outline-none"
                 >
                   {availableTopics.map((topic) => (
-                    <option key={topic} value={topic} className="text-graphite-900">
+                    <option
+                      key={topic}
+                      value={topic}
+                      className="text-graphite-900"
+                    >
                       {topic}
                     </option>
                   ))}
@@ -210,8 +284,16 @@ export function FlashcardDialog({ paper, open, onOpenChange }: FlashcardDialogPr
             <div className="rounded-[24px] border border-white/10 bg-black/10 p-4 text-sm text-white/68">
               <p className="mb-2 font-medium text-white">Set metadata</p>
               <p>Total cards: {flashcardQuery.data?.meta?.total_cards ?? 0}</p>
-              <p>Topics covered: {Array.isArray(flashcardQuery.data?.meta?.topics_covered) ? flashcardQuery.data?.meta?.topics_covered.length : 0}</p>
-              <p>Model: {String(flashcardQuery.data?.meta?.model_used ?? "Unknown")}</p>
+              <p>
+                Topics covered:{" "}
+                {Array.isArray(flashcardQuery.data?.meta?.topics_covered)
+                  ? flashcardQuery.data?.meta?.topics_covered.length
+                  : 0}
+              </p>
+              <p>
+                Model:{" "}
+                {String(flashcardQuery.data?.meta?.model_used ?? "Unknown")}
+              </p>
             </div>
           </div>
         </div>
@@ -223,7 +305,7 @@ export function FlashcardDialog({ paper, open, onOpenChange }: FlashcardDialogPr
 function getCardList(data: Awaited<ReturnType<typeof getFlashcards>>) {
   return data.flashcards.map((card, cardIndex) => ({
     ...card,
-    id: String(card.id ?? card.card_index ?? cardIndex)
+    id: String(card.id ?? card.card_index ?? cardIndex),
   }));
 }
 
