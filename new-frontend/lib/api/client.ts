@@ -1,9 +1,20 @@
+import { z } from "zod";
 import {
+  addProjectSourceResponseSchema,
   askResponseSchema,
   chatRequestSchema,
+  chatSessionDetailSchema,
+  chatSessionSchema,
+  createProjectSchema,
   flashcardSetSchema,
   mindMapSchema,
   paperSearchResponseSchema,
+  projectAskResponseSchema,
+  projectChatHistorySchema,
+  projectDetailSchema,
+  projectSummarySchema,
+  renameSessionSchema,
+  sessionAskResponseSchema,
   uploadAcceptedSchema,
   uploadStatusSchema,
   uploadedPaperSchema,
@@ -33,6 +44,12 @@ export async function getPapers(params: {
   });
 
   return readClientJson(response, paperSearchResponseSchema);
+}
+
+export async function deletePaper(paperId: string) {
+  return requestNoContent(`/api/papers/${paperId}`, {
+    method: "DELETE",
+  });
 }
 
 export async function getMindMap(paperId: string) {
@@ -88,22 +105,187 @@ export async function getUploadedPaper(paperId: string) {
 }
 
 export async function deleteUploadedPaper(paperId: string) {
-  const response = await fetch(`/api/uploads/${paperId}`, {
+  return requestNoContent(`/api/uploads/${paperId}`, {
     method: "DELETE",
   });
+}
 
-  if (!response.ok) {
-    const error = await safeError(response);
-    throw new Error(error ?? `Delete failed with status ${response.status}`);
-  }
+export async function listProjects() {
+  const response = await fetch("/api/projects", {
+    cache: "no-store",
+  });
+
+  return readClientJson(response, z.array(projectSummarySchema));
+}
+
+export async function createProject(payload: {
+  name: string;
+  description?: string | null;
+}) {
+  const body = createProjectSchema.parse({
+    name: payload.name,
+    description: normalizeOptionalText(payload.description),
+  });
+
+  const response = await fetch("/api/projects", {
+    method: "POST",
+    headers: jsonHeaders(),
+    body: JSON.stringify(body),
+  });
+
+  return readClientJson(response, projectSummarySchema);
+}
+
+export async function getProject(projectId: string) {
+  const response = await fetch(`/api/projects/${projectId}`, {
+    cache: "no-store",
+  });
+
+  return readClientJson(response, projectDetailSchema);
+}
+
+export async function deleteProject(projectId: string) {
+  return requestNoContent(`/api/projects/${projectId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function addPaperToProject(projectId: string, paperId: string) {
+  const response = await fetch(`/api/projects/${projectId}/sources`, {
+    method: "POST",
+    headers: jsonHeaders(),
+    body: JSON.stringify({ paper_id: paperId }),
+  });
+
+  return readClientJson(response, addProjectSourceResponseSchema);
+}
+
+export async function removePaperFromProject(projectId: string, paperId: string) {
+  return requestNoContent(`/api/projects/${projectId}/sources/${paperId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function getProjectChat(projectId: string) {
+  const response = await fetch(`/api/projects/${projectId}/chat`, {
+    cache: "no-store",
+  });
+
+  return readClientJson(response, projectChatHistorySchema);
+}
+
+export async function clearProjectChat(projectId: string) {
+  return requestNoContent(`/api/projects/${projectId}/chat`, {
+    method: "DELETE",
+  });
+}
+
+export async function askProjectChat(projectId: string, payload: ChatRequest) {
+  const response = await fetch(`/api/projects/${projectId}/ask`, {
+    method: "POST",
+    headers: jsonHeaders(),
+    body: JSON.stringify(chatRequestSchema.parse(payload)),
+  });
+
+  return readClientJson(response, projectAskResponseSchema);
+}
+
+export async function streamProjectChat(
+  projectId: string,
+  payload: ChatRequest,
+  signal?: AbortSignal,
+) {
+  const response = await fetch(`/api/projects/${projectId}/stream`, {
+    method: "POST",
+    headers: {
+      ...jsonHeaders(),
+      Accept: "text/plain",
+    },
+    body: JSON.stringify(chatRequestSchema.parse(payload)),
+    signal,
+  });
+
+  return ensureStreamingResponse(response);
+}
+
+export async function createChatSession() {
+  const response = await fetch("/api/chat/sessions", {
+    method: "POST",
+  });
+
+  return readClientJson(response, chatSessionSchema);
+}
+
+export async function listChatSessions() {
+  const response = await fetch("/api/chat/sessions", {
+    cache: "no-store",
+  });
+
+  return readClientJson(response, z.array(chatSessionSchema));
+}
+
+export async function getChatSession(sessionId: string) {
+  const response = await fetch(`/api/chat/sessions/${sessionId}`, {
+    cache: "no-store",
+  });
+
+  return readClientJson(response, chatSessionDetailSchema);
+}
+
+export async function renameChatSession(sessionId: string, title: string) {
+  const response = await fetch(`/api/chat/sessions/${sessionId}`, {
+    method: "PATCH",
+    headers: jsonHeaders(),
+    body: JSON.stringify(renameSessionSchema.parse({ title })),
+  });
+
+  return readClientJson(response, chatSessionSchema);
+}
+
+export async function deleteChatSession(sessionId: string) {
+  return requestNoContent(`/api/chat/sessions/${sessionId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function clearChatSession(sessionId: string) {
+  return requestNoContent(`/api/chat/sessions/${sessionId}/messages`, {
+    method: "DELETE",
+  });
+}
+
+export async function askChatSession(sessionId: string, payload: ChatRequest) {
+  const response = await fetch(`/api/chat/sessions/${sessionId}/ask`, {
+    method: "POST",
+    headers: jsonHeaders(),
+    body: JSON.stringify(chatRequestSchema.parse(payload)),
+  });
+
+  return readClientJson(response, sessionAskResponseSchema);
+}
+
+export async function streamChatSession(
+  sessionId: string,
+  payload: ChatRequest,
+  signal?: AbortSignal,
+) {
+  const response = await fetch(`/api/chat/sessions/${sessionId}/stream`, {
+    method: "POST",
+    headers: {
+      ...jsonHeaders(),
+      Accept: "text/plain",
+    },
+    body: JSON.stringify(chatRequestSchema.parse(payload)),
+    signal,
+  });
+
+  return ensureStreamingResponse(response);
 }
 
 export async function postChat(payload: ChatRequest) {
   const response = await fetch("/api/chat", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: jsonHeaders(),
     body: JSON.stringify(chatRequestSchema.parse(payload)),
   });
 
@@ -116,13 +298,26 @@ export async function postChatStream(
 ) {
   const response = await fetch("/api/chat/stream", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: jsonHeaders(),
     body: JSON.stringify(chatRequestSchema.parse(payload)),
     signal,
   });
 
+  return ensureStreamingResponse(response);
+}
+
+function jsonHeaders() {
+  return {
+    "Content-Type": "application/json",
+  };
+}
+
+function normalizeOptionalText(value?: string | null) {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
+async function ensureStreamingResponse(response: Response) {
   if (!response.ok || !response.body) {
     const error = await safeError(response);
     throw new Error(
@@ -131,6 +326,15 @@ export async function postChatStream(
   }
 
   return response;
+}
+
+async function requestNoContent(input: RequestInfo | URL, init?: RequestInit) {
+  const response = await fetch(input, init);
+
+  if (!response.ok) {
+    const error = await safeError(response);
+    throw new Error(error ?? `Request failed with status ${response.status}`);
+  }
 }
 
 async function readClientJson<T>(

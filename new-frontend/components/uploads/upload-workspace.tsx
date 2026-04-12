@@ -1,19 +1,23 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
   CheckCircle2,
   Clock,
   FileText,
+  FolderKanban,
   RefreshCw,
   Trash2,
   UploadCloud,
 } from "lucide-react";
 import {
+  addPaperToProject,
   deleteUploadedPaper,
   getUploadStatus,
   getUploadedPaper,
+  listProjects,
   uploadPaper,
 } from "@/lib/api/client";
 import type {
@@ -54,6 +58,12 @@ type UploadTask = {
   paper?: UploadedPaperResponse | null;
   error?: string | null;
   deleted?: boolean;
+  projectLink?: {
+    id: string;
+    name: string;
+    status: "pending" | "attaching" | "attached" | "error";
+    error?: string | null;
+  } | null;
 };
 
 const defaultMetadata: UploadMetadataDraft = {
@@ -76,6 +86,11 @@ export function UploadWorkspace() {
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState("");
+  const projectsQuery = useQuery({
+    queryKey: ["projects", "list"],
+    queryFn: listProjects,
+  });
 
   const activeTask = useMemo(
     () => uploads.find((task) => task.taskId === activeTaskId) ?? null,
@@ -131,6 +146,9 @@ export function UploadWorkspace() {
       }
 
       const response = await uploadPaper(formData);
+      const selectedProject =
+        projectsQuery.data?.find((project) => project.id === selectedProjectId) ??
+        null;
       const newTask: UploadTask = {
         taskId: response.task_id,
         accepted: response,
@@ -140,6 +158,13 @@ export function UploadWorkspace() {
         status: undefined,
         paper: null,
         error: null,
+        projectLink: selectedProject
+          ? {
+              id: selectedProject.id,
+              name: selectedProject.name,
+              status: "pending",
+            }
+          : null,
       };
 
       setUploads((current) => [newTask, ...current]);
@@ -151,7 +176,7 @@ export function UploadWorkspace() {
     } finally {
       setSubmitting(false);
     }
-  }, [file, metadata]);
+  }, [file, metadata, projectsQuery.data, selectedProjectId]);
 
   const pollTask = useCallback(async (taskId: string) => {
     setPollingTaskId(taskId);
@@ -184,6 +209,67 @@ export function UploadWorkspace() {
               : task,
           ),
         );
+
+        const taskSnapshot = uploads.find((task) => task.taskId === taskId);
+        const projectLink = taskSnapshot?.projectLink;
+
+        if (projectLink?.status === "pending") {
+          setUploads((current) =>
+            current.map((task) =>
+              task.taskId === taskId && task.projectLink
+                ? {
+                    ...task,
+                    projectLink: {
+                      ...task.projectLink,
+                      status: "attaching",
+                      error: null,
+                    },
+                  }
+                : task,
+            ),
+          );
+
+          try {
+            await addPaperToProject(projectLink.id, latest.paper_id);
+            setUploads((current) =>
+              current.map((task) =>
+                task.taskId === taskId && task.projectLink
+                  ? {
+                      ...task,
+                      projectLink: {
+                        ...task.projectLink,
+                        status: "attached",
+                        error: null,
+                      },
+                    }
+                  : task,
+              ),
+            );
+          } catch (attachmentError) {
+            const attachmentMessage =
+              attachmentError instanceof Error
+                ? attachmentError.message
+                : "Unable to add the uploaded paper to the project";
+            const alreadyExists = attachmentMessage
+              .toLowerCase()
+              .includes("already in this project");
+
+            setUploads((current) =>
+              current.map((task) =>
+                task.taskId === taskId && task.projectLink
+                  ? {
+                      ...task,
+                      projectLink: {
+                        ...task.projectLink,
+                        status: alreadyExists ? "attached" : "error",
+                        error: alreadyExists ? null : attachmentMessage,
+                      },
+                    }
+                  : task,
+              ),
+            );
+          }
+        }
       }
     } catch (err) {
       const message =
@@ -202,7 +288,7 @@ export function UploadWorkspace() {
     } finally {
       setPollingTaskId(null);
     }
-  }, []);
+  }, [uploads]);
 
   const pollAllActive = useCallback(async () => {
     const tasksToPoll = uploads.filter((task) => {
@@ -269,6 +355,7 @@ export function UploadWorkspace() {
   function resetForm() {
     setFile(null);
     setMetadata(defaultMetadata);
+    setSelectedProjectId("");
     setError(null);
   }
 
@@ -298,7 +385,27 @@ export function UploadWorkspace() {
   function progressLabel(task: UploadTask) {
     if (!task.status?.progress) return null;
     const step = (task.status.progress as Record<string, unknown>).step;
-    return typeof step === "string" ? step.replaceAll("_", " ") : null;
+    return typeof step === "string" ? step.replace(/_/g, " ") : null;
+  }
+
+  function projectStatusLabel(task: UploadTask) {
+    if (!task.projectLink) {
+      return null;
+    }
+
+    if (task.projectLink.status === "attached") {
+      return `Added to ${task.projectLink.name}`;
+    }
+
+    if (task.projectLink.status === "attaching") {
+      return `Adding to ${task.projectLink.name}...`;
+    }
+
+    if (task.projectLink.status === "error") {
+      return `Project add failed: ${task.projectLink.error ?? "Unknown error"}`;
+    }
+
+    return `Will add to ${task.projectLink.name} after processing`;
   }
 
   function StatusIcon(task: UploadTask) {
@@ -419,6 +526,25 @@ export function UploadWorkspace() {
                   }
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="upload-project">Project</Label>
+                <select
+                  id="upload-project"
+                  value={selectedProjectId}
+                  onChange={(event) => setSelectedProjectId(event.target.value)}
+                  className="field-surface h-12 w-full appearance-none rounded-2xl px-4 text-sm outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="">No project</option>
+                  {(projectsQuery.data ?? []).map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-muted-foreground">
+                  Optional. If selected, the paper will be added once indexing finishes.
+                </p>
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -508,6 +634,12 @@ export function UploadWorkspace() {
                             Current step: {progressLabel(task)}
                           </div>
                         ) : null}
+                        {projectStatusLabel(task) ? (
+                          <div className="mt-2 flex items-center gap-2 text-xs text-white/70">
+                            <FolderKanban className="h-3.5 w-3.5" />
+                            {projectStatusLabel(task)}
+                          </div>
+                        ) : null}
                         {task.error ? (
                           <div className="mt-2 text-xs text-rose-200">
                             {task.error}
@@ -569,6 +701,21 @@ export function UploadWorkspace() {
                       <span>No progress data yet.</span>
                     )}
                   </div>
+
+                  {activeTask.projectLink ? (
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-muted-foreground">
+                      <div className="mb-2 flex items-center gap-2 text-white">
+                        <FolderKanban className="h-4 w-4" />
+                        Project assignment
+                      </div>
+                      <p className="font-medium text-white">
+                        {activeTask.projectLink.name}
+                      </p>
+                      <p className="mt-1">
+                        {projectStatusLabel(activeTask)}
+                      </p>
+                    </div>
+                  ) : null}
 
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="text-xs text-white/60">

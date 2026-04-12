@@ -1,6 +1,13 @@
 "use client";
 
-import { Bookmark, BrainCircuit, FileText, Layers3 } from "lucide-react";
+import {
+  Bookmark,
+  BrainCircuit,
+  FileText,
+  FolderPlus,
+  Layers3,
+  Trash2,
+} from "lucide-react";
 import { motion } from "framer-motion";
 import type { Paper } from "@/lib/schemas";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +21,9 @@ type PaperCardProps = {
   onOpenPdf: (paper: Paper) => void;
   onOpenMindMap: (paper: Paper) => void;
   onOpenFlashcards: (paper: Paper) => void;
+  onAddToProject: (paper: Paper) => void;
+  onDeletePaper: (paper: Paper) => void;
+  deletePending?: boolean;
 };
 
 export function PaperCard({
@@ -22,7 +32,10 @@ export function PaperCard({
   onToggleBookmark,
   onOpenPdf,
   onOpenMindMap,
-  onOpenFlashcards
+  onOpenFlashcards,
+  onAddToProject,
+  onDeletePaper,
+  deletePending = false,
 }: PaperCardProps) {
   return (
     <motion.article
@@ -79,7 +92,19 @@ export function PaperCard({
           <Layers3 className="h-4 w-4" />
           Flashcards
         </Button>
-        <div className="flex items-center justify-end text-sm text-white/55">
+        <Button variant="outline" onClick={() => onAddToProject(paper)}>
+          <FolderPlus className="h-4 w-4" />
+          Add to Project
+        </Button>
+        <Button
+          variant="danger"
+          onClick={() => onDeletePaper(paper)}
+          disabled={deletePending}
+        >
+          <Trash2 className="h-4 w-4" />
+          {deletePending ? "Deleting..." : "Delete"}
+        </Button>
+        <div className="col-span-2 flex items-center justify-end text-sm text-white/55">
           {bookmarked ? "Bookmarked" : "Saved locally"}
         </div>
       </div>

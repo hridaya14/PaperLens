@@ -8,7 +8,7 @@ from src.config import Settings
 from src.db.interfaces.base import BaseDatabase
 from src.repositories.flashcards import FlashcardRepository
 from src.services.arxiv.client import ArxivClient
-from src.services.embeddings.jina_client import JinaEmbeddingsClient
+from src.services.embeddings.nvidia_client import NIMEmbeddingsClient
 from src.services.nvidia.client import NvidiaClient
 from src.services.opensearch.client import OpenSearchClient
 from src.services.pdf_parser.parser import PDFParserService
@@ -53,7 +53,7 @@ def get_pdf_parser(request: Request) -> PDFParserService:
     return request.app.state.pdf_parser
 
 
-def get_embeddings_service(request: Request) -> JinaEmbeddingsClient:
+def get_embeddings_service(request: Request) -> NIMEmbeddingsClient:
     """Get embeddings service from the request state."""
     return request.app.state.embeddings_service
 
@@ -100,7 +100,7 @@ OpenSearchDep = Annotated[OpenSearchClient, Depends(get_opensearch_client)]
 MindMapDep = Annotated[MindMapService, Depends(get_mindmap_client)]
 ArxivDep = Annotated[ArxivClient, Depends(get_arxiv_client)]
 PDFParserDep = Annotated[PDFParserService, Depends(get_pdf_parser)]
-EmbeddingsDep = Annotated[JinaEmbeddingsClient, Depends(get_embeddings_service)]
+EmbeddingsDep = Annotated[NIMEmbeddingsClient, Depends(get_embeddings_service)]
 NvidiaDep = Annotated[NvidiaClient, Depends(get_nvidia_client)]
 RedisDep = Annotated[Redis, Depends(get_redis_client)]
 FlashCardDep = Annotated[FlashcardService, Depends(get_flashcard_service)]

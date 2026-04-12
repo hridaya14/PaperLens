@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   BookOpenText,
@@ -10,7 +10,7 @@ import {
   Search,
   Sparkles,
 } from "lucide-react";
-import { getPapers } from "@/lib/api/client";
+import { deletePaper, getPapers } from "@/lib/api/client";
 import { AVAILABLE_CATEGORIES, RESULT_LIMITS } from "@/lib/constants";
 import { loadBookmarks, saveBookmarks, toggleBookmark } from "@/lib/bookmarks";
 import type { Paper } from "@/lib/schemas";
@@ -31,6 +31,7 @@ import { FlashcardDialog } from "@/components/papers/flashcard-dialog";
 import { MindMapDialog } from "@/components/papers/mindmap-dialog";
 import { PaperCard } from "@/components/papers/paper-card";
 import { PdfDialog } from "@/components/papers/pdf-dialog";
+import { ProjectPickerDialog } from "@/components/projects/project-picker-dialog";
 
 type SearchFilters = {
   query: string;
@@ -49,6 +50,7 @@ const defaultFilters: SearchFilters = {
 };
 
 export function PapersWorkspace() {
+  const queryClient = useQueryClient();
   const [draftFilters, setDraftFilters] =
     useState<SearchFilters>(defaultFilters);
   const [activeFilters, setActiveFilters] =
@@ -58,6 +60,8 @@ export function PapersWorkspace() {
   const [pdfPaper, setPdfPaper] = useState<Paper | null>(null);
   const [mindMapPaper, setMindMapPaper] = useState<Paper | null>(null);
   const [flashcardPaper, setFlashcardPaper] = useState<Paper | null>(null);
+  const [projectPickerPaper, setProjectPickerPaper] = useState<Paper | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     setBookmarks(loadBookmarks());
@@ -87,6 +91,10 @@ export function PapersWorkspace() {
       ? papers
       : papers.filter((paper) => bookmarks.includes(paper.id));
 
+  const deletePaperMutation = useMutation({
+    mutationFn: deletePaper,
+  });
+
   function applyFilters() {
     setActiveFilters(draftFilters);
   }
@@ -94,6 +102,41 @@ export function PapersWorkspace() {
   function resetFilters() {
     setDraftFilters(defaultFilters);
     setActiveFilters(defaultFilters);
+  }
+
+  async function handleDeletePaper(paper: Paper) {
+    const confirmed = window.confirm(
+      `Delete "${paper.title}"? This action cannot be undone.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setDeleteError(null);
+
+    try {
+      await deletePaperMutation.mutateAsync(paper.id);
+      setBookmarks((current) => current.filter((bookmarkId) => bookmarkId !== paper.id));
+
+      if (pdfPaper?.id === paper.id) {
+        setPdfPaper(null);
+      }
+
+      if (mindMapPaper?.id === paper.id) {
+        setMindMapPaper(null);
+      }
+
+      if (flashcardPaper?.id === paper.id) {
+        setFlashcardPaper(null);
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ["papers"] });
+    } catch (error) {
+      setDeleteError(
+        error instanceof Error ? error.message : "Delete request failed",
+      );
+    }
   }
 
   function renderFilters() {
@@ -363,25 +406,40 @@ export function PapersWorkspace() {
                 </CardContent>
               </Card>
             ) : visiblePapers.length ? (
-              <motion.div layout className="grid gap-6 xl:grid-cols-2">
-                <AnimatePresence>
-                  {visiblePapers.map((paper) => (
-                    <PaperCard
-                      key={paper.id}
-                      paper={paper}
-                      bookmarked={bookmarks.includes(paper.id)}
-                      onToggleBookmark={(paperId) =>
-                        setBookmarks((current) =>
-                          toggleBookmark(current, paperId),
-                        )
-                      }
-                      onOpenPdf={setPdfPaper}
-                      onOpenMindMap={setMindMapPaper}
-                      onOpenFlashcards={setFlashcardPaper}
-                    />
-                  ))}
-                </AnimatePresence>
-              </motion.div>
+              <div className="space-y-4">
+                {deleteError ? (
+                  <Card>
+                    <CardContent className="p-4 text-sm text-rose-200">
+                      {deleteError}
+                    </CardContent>
+                  </Card>
+                ) : null}
+                <motion.div layout className="grid gap-6 xl:grid-cols-2">
+                  <AnimatePresence>
+                    {visiblePapers.map((paper) => (
+                      <PaperCard
+                        key={paper.id}
+                        paper={paper}
+                        bookmarked={bookmarks.includes(paper.id)}
+                        onToggleBookmark={(paperId) =>
+                          setBookmarks((current) =>
+                            toggleBookmark(current, paperId),
+                          )
+                        }
+                        onOpenPdf={setPdfPaper}
+                        onOpenMindMap={setMindMapPaper}
+                        onOpenFlashcards={setFlashcardPaper}
+                        onAddToProject={setProjectPickerPaper}
+                        onDeletePaper={handleDeletePaper}
+                        deletePending={
+                          deletePaperMutation.isPending &&
+                          deletePaperMutation.variables === paper.id
+                        }
+                      />
+                    ))}
+                  </AnimatePresence>
+                </motion.div>
+              </div>
             ) : (
               <Card>
                 <CardContent className="flex flex-col items-center justify-center gap-4 p-10 text-center">
@@ -414,6 +472,11 @@ export function PapersWorkspace() {
         paper={flashcardPaper}
         open={Boolean(flashcardPaper)}
         onOpenChange={(open) => !open && setFlashcardPaper(null)}
+      />
+      <ProjectPickerDialog
+        paper={projectPickerPaper}
+        open={Boolean(projectPickerPaper)}
+        onOpenChange={(open) => !open && setProjectPickerPaper(null)}
       />
     </>
   );

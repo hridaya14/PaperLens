@@ -16,6 +16,14 @@ class AskRequest(BaseModel):
         "llama3.2:1b", description="Ollama model to use for generation")
     categories: Optional[List[str]] = Field(
         None, description="Filter by arXiv categories")
+    project_id: Optional[UUID] = Field(
+        None,
+        description=(
+            "Scope this query to a specific project. "
+            "Only chunks from papers added to the project will be retrieved. "
+            "When omitted, the entire index is searched."
+        ),
+    )
 
     class Config:
         json_schema_extra = {
@@ -39,6 +47,7 @@ class AskResponse(BaseModel):
                              description="Number of chunks used for generation")
     search_mode: str = Field(...,
                              description="Search mode used: bm25 or hybrid")
+    project_id: Optional[UUID] = Field(None, description="Project this answer was scoped to, if any")
 
     class Config:
         json_schema_extra = {

@@ -70,6 +70,9 @@ class PaperRepository:
         if filters.published_before:
             stmt = stmt.where(Paper.published_date <= filters.published_before)
 
+        if filters.source:
+            stmt = stmt.where(Paper.source == filters.source)
+
         # ---- Total count (before pagination) ----
         total = self.session.scalar(
             select(func.count()).select_from(stmt.subquery())

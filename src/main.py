@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from src.config import get_settings
 from src.db.factory import make_database
 from src.db.redis.redis import get_redis_client
-from src.routers import hybrid_search, papers, ping, uploads, visualization
+from src.routers import chat, hybrid_search, papers, ping, project, uploads, visualization
 from src.routers.ask import ask_router, stream_router
 from src.services.arxiv.factory import make_arxiv_client
 from src.services.embeddings.factory import make_embeddings_service
@@ -105,6 +105,10 @@ app.include_router(visualization.router, prefix="/api/v1")
 # RAG question answering with LLM
 app.include_router(ask_router, prefix="/api/v1")
 app.include_router(stream_router, prefix="/api/v1")  # Streaming RAG responses
+
+# Chat and project management
+app.include_router(chat.router, prefix="/api/v1")
+app.include_router(project.router, prefix="/api/v1")
 
 
 if __name__ == "__main__":
