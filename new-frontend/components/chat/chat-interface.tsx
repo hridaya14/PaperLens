@@ -57,7 +57,13 @@ import {
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -107,6 +113,7 @@ export function ChatInterface() {
     id: null,
   });
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const [projectDialogOpen, setProjectDialogOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
@@ -204,10 +211,10 @@ export function ChatInterface() {
       : `project:${activeWorkspace.id}`;
   const activeWorkspaceTitle =
     activeWorkspace.type === "project"
-      ? activeProject?.name ?? activeProjectSummary?.name ?? "Project"
-      : activeSessionQuery.data?.title ??
+      ? (activeProject?.name ?? activeProjectSummary?.name ?? "Project")
+      : (activeSessionQuery.data?.title ??
         activeSessionSummary?.title ??
-        (activeWorkspace.id ? "Untitled chat" : "New chat");
+        (activeWorkspace.id ? "Untitled chat" : "New chat"));
   const activeWorkspaceSubtitle =
     activeWorkspace.type === "project"
       ? activeProject?.description?.trim() ||
@@ -241,13 +248,12 @@ export function ChatInterface() {
     initializedWorkspaceRef.current = true;
 
     if ((sessionsQuery.data?.length ?? 0) > 0) {
-      setActiveWorkspace({ type: "session", id: sessionsQuery.data?.[0]?.id ?? null });
+      setActiveWorkspace({
+        type: "session",
+        id: sessionsQuery.data?.[0]?.id ?? null,
+      });
     }
-  }, [
-    projectsQuery.isLoading,
-    sessionsQuery.data,
-    sessionsQuery.isLoading,
-  ]);
+  }, [projectsQuery.isLoading, sessionsQuery.data, sessionsQuery.isLoading]);
 
   useEffect(() => {
     if (isStreaming) {
@@ -380,7 +386,11 @@ export function ChatInterface() {
     try {
       const response =
         workingWorkspace.type === "project"
-          ? await streamProjectChat(workingWorkspace.id, payload, controller.signal)
+          ? await streamProjectChat(
+              workingWorkspace.id,
+              payload,
+              controller.signal,
+            )
           : await streamChatSession(
               workingWorkspace.id as string,
               payload,
@@ -464,10 +474,7 @@ export function ChatInterface() {
         }
       }
     } finally {
-      await invalidateWorkspaceQueries(
-        queryClient,
-        workingWorkspace,
-      );
+      await invalidateWorkspaceQueries(queryClient, workingWorkspace);
       setIsStreaming(false);
       abortControllerRef.current = null;
     }
@@ -570,33 +577,38 @@ export function ChatInterface() {
     setIsStreaming(false);
   }
 
-  function renderSidebar() {
+  function renderSidebar(collapsed: boolean) {
     return (
-      <div className="space-y-6">
+      <div className={cn("space-y-6", collapsed && "space-y-4")}>
         <div className="space-y-3">
           <Button
-            className="w-full justify-center"
+            className={cn("w-full justify-center gap-2", collapsed && "px-3")}
             onClick={() => handleSelectSession(null)}
           >
             <Plus className="h-4 w-4" />
-            New chat
+            <span className={cn(collapsed && "sr-only")}>New chat</span>
           </Button>
           <Button
             variant="outline"
-            className="w-full justify-center"
+            className={cn("w-full justify-center gap-2", collapsed && "px-3")}
             onClick={() => {
               setWorkspaceError(null);
               setProjectDialogOpen(true);
             }}
           >
             <FolderPlus className="h-4 w-4" />
-            New project
+            <span className={cn(collapsed && "sr-only")}>New project</span>
           </Button>
         </div>
 
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-xs uppercase tracking-[0.2em] text-white/45">
+            <p
+              className={cn(
+                "text-xs uppercase tracking-[0.2em] text-white/45",
+                collapsed && "sr-only",
+              )}
+            >
               General chats
             </p>
             <Badge variant="muted">{sessionsQuery.data?.length ?? 0}</Badge>
@@ -612,8 +624,15 @@ export function ChatInterface() {
                 : "border-white/10 bg-white/5 text-white/75 hover:bg-white/8",
             )}
           >
-            <p className="font-medium">New chat draft</p>
-            <p className="mt-1 text-xs text-white/55">
+            <p className={cn("font-medium", collapsed && "text-xs")}>
+              New chat draft
+            </p>
+            <p
+              className={cn(
+                "mt-1 text-xs text-white/55",
+                collapsed && "sr-only",
+              )}
+            >
               Start fresh against the full library
             </p>
           </button>
@@ -643,7 +662,12 @@ export function ChatInterface() {
 
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-xs uppercase tracking-[0.2em] text-white/45">
+            <p
+              className={cn(
+                "text-xs uppercase tracking-[0.2em] text-white/45",
+                collapsed && "sr-only",
+              )}
+            >
               Projects
             </p>
             <Badge variant="muted">{projectsQuery.data?.length ?? 0}</Badge>
@@ -667,11 +691,95 @@ export function ChatInterface() {
             ))
           ) : (
             <div className="rounded-[24px] border border-dashed border-white/10 bg-white/5 p-4 text-sm text-muted-foreground">
-              Projects give you a scoped source set and a separate persistent thread.
+              Projects give you a scoped source set and a separate persistent
+              thread.
             </div>
           )}
         </div>
       </div>
+    );
+  }
+
+  function renderProjectSources(collapsed: boolean) {
+    if (activeWorkspace.type !== "project") {
+      return null;
+    }
+
+    const sourceCount =
+      activeProject?.sources.length ?? activeProjectSummary?.source_count ?? 0;
+
+    if (collapsed) {
+      return (
+        <Card className="overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 p-4">
+            <CardTitle className="text-sm">Sources</CardTitle>
+            <Badge variant="muted">{sourceCount}</Badge>
+          </CardHeader>
+        </Card>
+      );
+    }
+
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Project sources</CardTitle>
+          <CardDescription>
+            These papers define the retrieval scope for this thread.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {activeProject?.sources.length ? (
+            activeProject.sources.map((source) => (
+              <div
+                key={source.id}
+                className="rounded-[22px] border border-white/10 bg-white/5 p-4"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <p className="font-medium text-white">
+                      {truncateText(source.title, 90)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Added {formatDate(source.added_at)}
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={
+                      removeSourceMutation.isPending &&
+                      removeSourceMutation.variables?.paperId === source.id
+                    }
+                    onClick={() =>
+                      removeSourceMutation.mutate({
+                        projectId: activeWorkspace.id,
+                        paperId: source.id,
+                      })
+                    }
+                  >
+                    Remove
+                  </Button>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Badge variant={source.pdf_processed ? "success" : "muted"}>
+                    {source.pdf_processed ? "Processed" : "Processing"}
+                  </Badge>
+                  {source.categories.slice(0, 3).map((category) => (
+                    <Badge key={category} variant="muted">
+                      {category}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="rounded-[24px] border border-dashed border-white/10 bg-white/5 p-4 text-sm text-muted-foreground">
+              Add papers from the library or uploads workspace to start using
+              this project.
+            </div>
+          )}
+        </CardContent>
+      </Card>
     );
   }
 
@@ -714,19 +822,45 @@ export function ChatInterface() {
           </div>
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)_320px]">
-          <aside className="hidden xl:block">
-            <Card className="sticky top-28 max-h-[calc(100vh-8rem)] overflow-hidden">
-              <CardHeader>
-                <CardTitle>Workspaces</CardTitle>
-                <CardDescription>
-                  Switch between general chats and project-specific threads.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="max-h-[calc(100vh-14rem)] overflow-y-auto pr-2">
-                {renderSidebar()}
-              </CardContent>
-            </Card>
+        <div className="grid gap-6 xl:grid-cols-[auto_minmax(0,1fr)_320px]">
+          <aside className="hidden xl:flex">
+            <div
+              className={cn(
+                "sticky top-24 h-[calc(100vh-6rem)] transition-all",
+                sidebarCollapsed ? "w-20" : "w-80",
+              )}
+            >
+              <div className="flex h-full flex-col gap-4">
+                <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                  <CardHeader className="flex flex-row items-start justify-between gap-3">
+                    <div className={cn(sidebarCollapsed && "sr-only")}>
+                      <CardTitle>Workspaces</CardTitle>
+                      <CardDescription>
+                        Switch between general chats and project-specific
+                        threads.
+                      </CardDescription>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0"
+                      onClick={() => setSidebarCollapsed((current) => !current)}
+                    >
+                      <PanelLeft className="h-4 w-4" />
+                    </Button>
+                  </CardHeader>
+                  <CardContent
+                    className={cn(
+                      "min-h-0 flex-1 overflow-y-auto pr-2",
+                      sidebarCollapsed && "px-2",
+                    )}
+                  >
+                    {renderSidebar(sidebarCollapsed)}
+                  </CardContent>
+                </Card>
+                {renderProjectSources(sidebarCollapsed)}
+              </div>
+            </div>
           </aside>
 
           <div className="space-y-6">
@@ -772,8 +906,10 @@ export function ChatInterface() {
                           initial={{ opacity: 0, y: 16 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -16 }}
-                          className={`flex gap-4 ${
-                            message.role === "assistant" ? "" : "justify-end"
+                          className={`flex w-full gap-4 ${
+                            message.role === "assistant"
+                              ? "justify-start"
+                              : "justify-end"
                           }`}
                         >
                           {message.role === "assistant" ? (
@@ -783,10 +919,10 @@ export function ChatInterface() {
                           ) : null}
 
                           <div
-                            className={`max-w-3xl rounded-[28px] border px-5 py-4 ${
+                            className={`w-full max-w-[720px] rounded-3xl border px-6 py-5 shadow-sm ${
                               message.role === "assistant"
                                 ? "border-white/10 bg-white/5 text-white"
-                                : "border-amber-300/15 bg-amber-300/12 text-amber-50"
+                                : "border-amber-300/20 bg-amber-300/12 text-amber-50"
                             }`}
                           >
                             {message.role === "assistant" ? (
@@ -796,7 +932,9 @@ export function ChatInterface() {
                                 </ReactMarkdown>
                               </div>
                             ) : (
-                              <p className="text-sm leading-7">{message.content}</p>
+                              <p className="text-sm leading-7">
+                                {message.content}
+                              </p>
                             )}
 
                             {message.role === "assistant" ? (
@@ -817,7 +955,9 @@ export function ChatInterface() {
                                     <Badge variant="muted">Streaming</Badge>
                                   ) : null}
                                   {message.status === "error" ? (
-                                    <Badge variant="danger">Needs attention</Badge>
+                                    <Badge variant="danger">
+                                      Needs attention
+                                    </Badge>
                                   ) : null}
                                 </div>
 
@@ -827,8 +967,13 @@ export function ChatInterface() {
                                     collapsible
                                     className="rounded-[20px] border border-white/10 bg-black/15 px-4"
                                   >
-                                    <AccordionItem value="sources" className="border-none">
-                                      <AccordionTrigger>Sources</AccordionTrigger>
+                                    <AccordionItem
+                                      value="sources"
+                                      className="border-none"
+                                    >
+                                      <AccordionTrigger>
+                                        Sources
+                                      </AccordionTrigger>
                                       <AccordionContent>
                                         <ul className="space-y-2 text-sm">
                                           {message.sources.map((source) => (
@@ -882,7 +1027,10 @@ export function ChatInterface() {
                       : "What problem does this paper solve? How do recent multimodal approaches differ from earlier work?"
                   }
                   onKeyDown={(event) => {
-                    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+                    if (
+                      (event.metaKey || event.ctrlKey) &&
+                      event.key === "Enter"
+                    ) {
                       event.preventDefault();
                       void handleSubmit();
                     }
@@ -894,7 +1042,10 @@ export function ChatInterface() {
                     Press Cmd/Ctrl + Enter to send
                   </p>
                   <div className="flex flex-wrap gap-3">
-                    <Button variant="outline" onClick={() => void handleClearHistory()}>
+                    <Button
+                      variant="outline"
+                      onClick={() => void handleClearHistory()}
+                    >
                       <Trash2 className="h-4 w-4" />
                       Clear history
                     </Button>
@@ -931,7 +1082,9 @@ export function ChatInterface() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
-                  <p className="font-medium text-white">{activeWorkspaceTitle}</p>
+                  <p className="font-medium text-white">
+                    {activeWorkspaceTitle}
+                  </p>
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">
                     {activeWorkspaceSubtitle}
                   </p>
@@ -940,7 +1093,12 @@ export function ChatInterface() {
                 <div className="flex flex-wrap gap-2">
                   {activeWorkspace.type === "project" ? (
                     <>
-                      <Badge>{activeProject?.sources.length ?? activeProjectSummary?.source_count ?? 0} sources</Badge>
+                      <Badge>
+                        {activeProject?.sources.length ??
+                          activeProjectSummary?.source_count ??
+                          0}{" "}
+                        sources
+                      </Badge>
                       {activeProject?.overview ? (
                         <Badge variant="muted">Overview ready</Badge>
                       ) : (
@@ -952,7 +1110,11 @@ export function ChatInterface() {
                       <Badge>{messages.length} loaded messages</Badge>
                       {activeWorkspace.id ? (
                         <Badge variant="muted">
-                          Updated {formatDate(activeSessionQuery.data?.updated_at ?? activeSessionSummary?.updated_at)}
+                          Updated{" "}
+                          {formatDate(
+                            activeSessionQuery.data?.updated_at ??
+                              activeSessionSummary?.updated_at,
+                          )}
                         </Badge>
                       ) : (
                         <Badge variant="muted">Draft mode</Badge>
@@ -968,12 +1130,15 @@ export function ChatInterface() {
                     </div>
                   ) : (
                     <div className="rounded-[24px] border border-dashed border-white/10 bg-white/5 p-4 text-sm text-muted-foreground">
-                      This project does not have an overview yet. Once you start curating sources here, this panel can show a higher-level summary.
+                      This project does not have an overview yet. Once you start
+                      curating sources here, this panel can show a higher-level
+                      summary.
                     </div>
                   )
                 ) : (
                   <div className="rounded-[24px] border border-dashed border-white/10 bg-white/5 p-4 text-sm text-muted-foreground">
-                    Session titles are derived from the first user message and stay separate from project threads.
+                    Session titles are derived from the first user message and
+                    stay separate from project threads.
                   </div>
                 )}
 
@@ -992,73 +1157,12 @@ export function ChatInterface() {
               </CardContent>
             </Card>
 
-            {activeWorkspace.type === "project" ? (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Project sources</CardTitle>
-                  <CardDescription>
-                    These papers define the retrieval scope for this thread.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {activeProject?.sources.length ? (
-                    activeProject.sources.map((source) => (
-                      <div
-                        key={source.id}
-                        className="rounded-[22px] border border-white/10 bg-white/5 p-4"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="space-y-1">
-                            <p className="font-medium text-white">
-                              {truncateText(source.title, 90)}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              Added {formatDate(source.added_at)}
-                            </p>
-                          </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={
-                              removeSourceMutation.isPending &&
-                              removeSourceMutation.variables?.paperId === source.id
-                            }
-                            onClick={() =>
-                              removeSourceMutation.mutate({
-                                projectId: activeWorkspace.id,
-                                paperId: source.id,
-                              })
-                            }
-                          >
-                            Remove
-                          </Button>
-                        </div>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          <Badge variant={source.pdf_processed ? "success" : "muted"}>
-                            {source.pdf_processed ? "Processed" : "Processing"}
-                          </Badge>
-                          {source.categories.slice(0, 3).map((category) => (
-                            <Badge key={category} variant="muted">
-                              {category}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="rounded-[24px] border border-dashed border-white/10 bg-white/5 p-4 text-sm text-muted-foreground">
-                      Add papers from the library or uploads workspace to start using this project.
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ) : null}
-
             <Card className="h-fit">
               <CardHeader>
                 <CardTitle>RAG settings</CardTitle>
                 <CardDescription>
-                  These map directly to the backend request body for both sessions and projects.
+                  These map directly to the backend request body for both
+                  sessions and projects.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -1131,7 +1235,8 @@ export function ChatInterface() {
                           type="button"
                           onClick={() =>
                             setSettings((current) => {
-                              const currentCategories = current.categories ?? [];
+                              const currentCategories =
+                                current.categories ?? [];
                               return {
                                 ...current,
                                 categories: active
@@ -1156,7 +1261,9 @@ export function ChatInterface() {
                 </div>
 
                 <div className="rounded-[24px] border border-dashed border-white/10 bg-white/5 p-4 text-sm leading-6 text-muted-foreground">
-                  Streaming is the default path. If it fails, the client falls back to the standard non-streaming ask route for the same workspace.
+                  Streaming is the default path. If it fails, the client falls
+                  back to the standard non-streaming ask route for the same
+                  workspace.
                 </div>
               </CardContent>
             </Card>
@@ -1165,14 +1272,18 @@ export function ChatInterface() {
       </section>
 
       <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-        <SheetContent side="left">
+        <SheetContent side="left" className="w-[92vw] sm:w-96">
           <div className="space-y-2">
             <h2 className="font-serif text-3xl font-semibold">Workspaces</h2>
             <p className="text-sm text-muted-foreground">
-              Jump between persistent general chats and project-specific threads.
+              Jump between persistent general chats and project-specific
+              threads.
             </p>
           </div>
-          <div className="overflow-y-auto pr-1">{renderSidebar()}</div>
+          <div className="mt-4 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
+            {renderSidebar(false)}
+            {renderProjectSources(false)}
+          </div>
         </SheetContent>
       </Sheet>
 
@@ -1181,7 +1292,8 @@ export function ChatInterface() {
           <DialogHeader>
             <DialogTitle>Create Project</DialogTitle>
             <DialogDescription>
-              Projects keep a separate source list and a separate persisted chat thread.
+              Projects keep a separate source list and a separate persisted chat
+              thread.
             </DialogDescription>
           </DialogHeader>
 
@@ -1201,7 +1313,9 @@ export function ChatInterface() {
               <Textarea
                 id="project-description"
                 value={newProjectDescription}
-                onChange={(event) => setNewProjectDescription(event.target.value)}
+                onChange={(event) =>
+                  setNewProjectDescription(event.target.value)
+                }
                 placeholder="Optional context for this research track"
                 className="min-h-[130px]"
               />
@@ -1210,12 +1324,15 @@ export function ChatInterface() {
             <Button
               className="w-full"
               disabled={
-                createProjectMutation.isPending || newProjectName.trim().length === 0
+                createProjectMutation.isPending ||
+                newProjectName.trim().length === 0
               }
               onClick={() => createProjectMutation.mutate()}
             >
               <FolderPlus className="h-4 w-4" />
-              {createProjectMutation.isPending ? "Creating..." : "Create project"}
+              {createProjectMutation.isPending
+                ? "Creating..."
+                : "Create project"}
             </Button>
           </div>
         </DialogContent>
@@ -1245,13 +1362,15 @@ function SidebarSessionButton({
       )}
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="space-y-1">
-          <p className="font-medium">{session.title ?? "Untitled chat"}</p>
-          <p className="text-xs text-white/55">
+        <div className="min-w-0 space-y-1">
+          <p className="truncate font-medium">
+            {session.title ?? "Untitled chat"}
+          </p>
+          <p className="truncate text-xs text-white/55">
             {session.message_count} messages
           </p>
         </div>
-        <span className="text-xs text-white/45">
+        <span className="shrink-0 text-xs text-white/45">
           {formatDate(session.updated_at)}
         </span>
       </div>
@@ -1280,13 +1399,13 @@ function SidebarProjectButton({
       )}
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="space-y-1">
-          <p className="font-medium">{project.name}</p>
-          <p className="text-xs text-white/55">
+        <div className="min-w-0 space-y-1">
+          <p className="truncate font-medium">{project.name}</p>
+          <p className="truncate text-xs text-white/55">
             {project.source_count} sources
           </p>
         </div>
-        <div className="flex items-center gap-2 text-xs text-white/45">
+        <div className="shrink-0 flex items-center gap-2 text-xs text-white/45">
           <FolderKanban className="h-3.5 w-3.5" />
           {formatDate(project.updated_at)}
         </div>

@@ -1,12 +1,11 @@
+import logging
+import pathlib
+import uuid
 from datetime import datetime
 from typing import List, Optional
-import logging
-import uuid as uuid_lib
-import pathlib
 
 from fastapi import APIRouter, HTTPException, Path, Query, status
 from fastapi.responses import FileResponse
-
 from src.dependencies import OpenSearchDep, SessionDep
 from src.repositories.paper import PaperRepository
 from src.schemas.arxiv.paper import PaperResponse, PaperSearchFilters, PaperSearchResponse
@@ -73,6 +72,7 @@ def get_paper_details(
         raise HTTPException(status_code=404, detail="Paper not found")
     return PaperResponse.model_validate(paper)
 
+
 @router.get(
     "/{paper_id}/pdf",
     summary="Serve the PDF file for an uploaded paper",
@@ -124,7 +124,7 @@ def delete_paper(
     opensearch: OpenSearchDep,
 ) -> None:
     try:
-        paper_uuid = uuid_lib.UUID(paper_id)
+        paper_uuid = uuid.UUID(paper_id)
     except ValueError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

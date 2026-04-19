@@ -245,8 +245,6 @@ class OpenSearchClient:
         bm25_search_body = builder.build()
         bm25_query = bm25_search_body["query"]
 
-        # For the knn sub-query we need to apply the paper_ids filter separately
-        # since knn doesn't go through the bool/filter path.
         knn_query: Dict[str, Any] = {"knn": {"embedding": {"vector": query_embedding, "k": size * 2}}}
         if paper_ids:
             knn_query = {
@@ -337,6 +335,16 @@ class OpenSearchClient:
             return False
 
     def get_chunks_by_paper(self, arxiv_id: str) -> List[Dict[str, Any]]:
+        """Retrieve all chunks for an arXiv-ingested paper, ordered by chunk_index.
+
+        For user-uploaded papers (no arXiv ID), use :meth:`get_chunks_by_paper_uuid` instead.
+
+        Args:
+            arxiv_id: The arXiv paper identifier (e.g. ``"2401.00001"``).
+
+        Returns:
+            Ordered list of chunk dicts with ``chunk_id`` injected.
+        """
         try:
             search_body = {
                 "query": {"term": {"arxiv_id": arxiv_id}},
@@ -356,5 +364,61 @@ class OpenSearchClient:
             return chunks
 
         except Exception as e:
-            logger.error(f"Error getting chunks: {e}")
+            logger.error(f"Error getting chunks by arxiv_id '{arxiv_id}': {e}")
             return []
+
+    def get_chunks_by_paper_uuid(self, paper_uuid: str) -> List[Dict[str, Any]]:
+        """Retrieve all chunks for a user-uploaded paper identified by its UUID.
+
+        User-uploaded papers are indexed without an ``arxiv_id``; their chunks
+        carry the Postgres ``paper_id`` (UUID) in the ``paper_id`` field instead.
+
+        Args:
+            paper_uuid: String representation of the paper's UUID primary key.
+
+        Returns:
+            Ordered list of chunk dicts with ``chunk_id`` injected.
+        """
+        try:
+            search_body = {
+                "query": {"term": {"paper_id": paper_uuid}},
+                "size": 1000,
+                "sort": [{"chunk_index": "asc"}],
+                "_source": {"excludes": ["embedding"]},
+            }
+
+            response = self.client.search(index=self.index_name, body=search_body)
+
+            chunks = []
+            for hit in response["hits"]["hits"]:
+                chunk = hit["_source"]
+                chunk["chunk_id"] = hit["_id"]
+                chunks.append(chunk)
+
+            logger.info(f"UUID chunk lookup for '{paper_uuid}' returned {len(chunks)} chunks")
+            return chunks
+
+        except Exception as e:
+            logger.error(f"Error getting chunks by paper_uuid '{paper_uuid}': {e}")
+            return []
+
+    def get_chunks_for_paper(self, paper_uuid: str, arxiv_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Unified chunk retrieval that works for both arXiv and user-uploaded papers.
+
+        Routing logic:
+        - If *arxiv_id* is provided → query the ``arxiv_id`` field (arXiv-ingested paper).
+        - Otherwise → query the ``paper_id`` field using *paper_uuid* (user upload).
+
+        This is the preferred method to call from routers and services so that
+        the routing decision lives in one place.
+
+        Args:
+            paper_uuid: String UUID of the paper (always available from the DB record).
+            arxiv_id:   arXiv ID of the paper, or ``None`` for user uploads.
+
+        Returns:
+            Ordered list of chunk dicts with ``chunk_id`` injected.
+        """
+        if arxiv_id:
+            return self.get_chunks_by_paper(arxiv_id)
+        return self.get_chunks_by_paper_uuid(paper_uuid)

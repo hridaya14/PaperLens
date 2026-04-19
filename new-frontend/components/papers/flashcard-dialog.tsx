@@ -27,16 +27,16 @@ export function FlashcardDialog({
   open,
   onOpenChange,
 }: FlashcardDialogProps) {
-  const arxivId = paper?.arxiv_id ?? null;
+  const paperRef = paper?.arxiv_id ?? paper?.id ?? null;
   const flashcardQuery = useQuery({
-    queryKey: ["flashcards", arxivId],
+    queryKey: ["flashcards", paperRef],
     queryFn: () => {
-      if (!arxivId) {
-        return Promise.reject(new Error("Missing arXiv ID"));
+      if (!paperRef) {
+        return Promise.reject(new Error("Missing paper reference"));
       }
-      return getFlashcards(arxivId, { numCards: 15 });
+      return getFlashcards(paperRef, { numCards: 15 });
     },
-    enabled: open && Boolean(arxivId),
+    enabled: open && Boolean(paperRef),
   });
 
   const [cards, setCards] = useState<ReturnType<typeof getCardList>>([]);
@@ -112,10 +112,9 @@ export function FlashcardDialog({
 
         <div className="grid gap-6 p-8 lg:grid-cols-[1.15fr_0.6fr]">
           <div className="space-y-5">
-            {!paper?.arxiv_id ? (
+            {!paperRef ? (
               <div className="flex min-h-[420px] items-center justify-center rounded-[30px] border border-white/10 bg-white/5 px-6 text-center text-sm text-white/70">
-                Flashcards are only available for arXiv-sourced papers right
-                now. Uploads can still be read in the PDF viewer.
+                Select a paper to generate flashcards.
               </div>
             ) : flashcardQuery.isLoading ? (
               <div className="flex min-h-[420px] items-center justify-center rounded-[30px] border border-white/10 bg-white/5 text-sm text-white/70">

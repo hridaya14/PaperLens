@@ -1,12 +1,12 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 from src.models.paper import Paper
 from src.schemas.arxiv.paper import PaperCreate, PaperSearchFilters
-from sqlalchemy import or_
+
 
 class PaperRepository:
     def __init__(self, session: Session):
@@ -27,12 +27,47 @@ class PaperRepository:
         stmt = select(Paper).where(Paper.id == paper_id)
         return self.session.scalar(stmt)
 
+    def get_by_id_or_arxiv_id(self, paper_ref: str) -> Optional[Paper]:
+        """Resolve a paper from either a UUID string or an arXiv ID string.
+
+        Resolution order:
+        1. Try to parse *paper_ref* as a UUID → look up by primary key.
+        2. Fall back to arXiv ID lookup.
+
+        This lets visualization endpoints accept both user-uploaded papers
+        (identified by UUID) and arXiv-ingested papers (identified by arXiv ID)
+        under the same ``paper_id`` path parameter.
+
+        Args:
+            paper_ref: Either a UUID string (e.g. ``"3fa85f64-5717-4562-b3fc-2c963f66afa6"``)
+                       or an arXiv ID string (e.g. ``"2401.00001"`` / ``"2401.00001v2"``).
+
+        Returns:
+            The matching :class:`Paper` ORM instance, or ``None`` if not found.
+        """
+        # 1. Try UUID path first — UUIDs always contain hyphens in the canonical
+        #    form, which arXiv IDs never do, so this is unambiguous.
+        try:
+            uuid = UUID(paper_ref)
+            paper = self.get_by_id(uuid)
+            if paper is not None:
+                return paper
+        except (ValueError, AttributeError):
+            pass
+
+        # 2. Fall back to arXiv ID lookup.
+        return self.get_by_arxiv_id(paper_ref)
+
     def get_all(self, limit: int = 100, offset: int = 0) -> List[Paper]:
-        stmt = select(Paper).order_by(
-            Paper.published_date.desc()).limit(limit).offset(offset)
+        stmt = select(Paper).order_by(Paper.published_date.desc()).limit(limit).offset(offset)
         return list(self.session.scalars(stmt))
 
-    def search(self, filters: PaperSearchFilters, limit: int = 20, offset: int = 0,) -> List[Paper]:
+    def search(
+        self,
+        filters: PaperSearchFilters,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> Tuple[List[Paper], int]:
         stmt = select(Paper)
 
         # ---- Full-text search ----
@@ -40,9 +75,7 @@ class PaperRepository:
             ts_query = func.plainto_tsquery("english", filters.query)
             rank_expr = func.ts_rank_cd(Paper.search_vector, ts_query)
 
-            stmt = stmt.where(
-                Paper.search_vector.op("@@")(ts_query)
-            ).order_by(
+            stmt = stmt.where(Paper.search_vector.op("@@")(ts_query)).order_by(
                 rank_expr.desc(),
                 Paper.published_date.desc(),
             )
@@ -50,15 +83,9 @@ class PaperRepository:
             stmt = stmt.order_by(Paper.published_date.desc())
 
         # ---- Category filter ----
-
         if filters.categories:
-            stmt = stmt.where(
-                or_(*[
-                    Paper.categories.contains([cat])
-                    for cat in filters.categories
-                ])
-            )
-        
+            stmt = stmt.where(or_(*[Paper.categories.contains([cat]) for cat in filters.categories]))
+
         # ---- PDF processed filter ----
         if filters.pdf_processed is not None:
             stmt = stmt.where(Paper.pdf_processed == filters.pdf_processed)
@@ -74,9 +101,7 @@ class PaperRepository:
             stmt = stmt.where(Paper.source == filters.source)
 
         # ---- Total count (before pagination) ----
-        total = self.session.scalar(
-            select(func.count()).select_from(stmt.subquery())
-        ) or 0
+        total = self.session.scalar(select(func.count()).select_from(stmt.subquery())) or 0
 
         # ---- Pagination ----
         stmt = stmt.limit(limit).offset(offset)
@@ -100,26 +125,21 @@ class PaperRepository:
 
     def get_unprocessed_papers(self, limit: int = 100, offset: int = 0) -> List[Paper]:
         """Get papers that haven't been processed for PDF content yet."""
-        stmt = select(Paper).where(Paper.pdf_processed == False).order_by(
-            Paper.published_date.desc()).limit(limit).offset(offset)
+        stmt = select(Paper).where(Paper.pdf_processed == False).order_by(Paper.published_date.desc()).limit(limit).offset(offset)
         return list(self.session.scalars(stmt))
 
     def get_papers_with_raw_text(self, limit: int = 100, offset: int = 0) -> List[Paper]:
         """Get papers that have raw text content stored."""
-        stmt = select(Paper).where(Paper.raw_text != None).order_by(
-            Paper.pdf_processing_date.desc()).limit(limit).offset(offset)
+        stmt = select(Paper).where(Paper.raw_text != None).order_by(Paper.pdf_processing_date.desc()).limit(limit).offset(offset)
         return list(self.session.scalars(stmt))
 
     def get_processing_stats(self) -> dict:
         """Get statistics about PDF processing status."""
         total_papers = self.get_count()
 
-        # Count processed papers
-        processed_stmt = select(func.count(Paper.id)).where(
-            Paper.pdf_processed == True)
+        processed_stmt = select(func.count(Paper.id)).where(Paper.pdf_processed == True)
         processed_papers = self.session.scalar(processed_stmt) or 0
 
-        # Count papers with text
         text_stmt = select(func.count(Paper.id)).where(Paper.raw_text != None)
         papers_with_text = self.session.scalar(text_stmt) or 0
 
@@ -138,24 +158,21 @@ class PaperRepository:
         return paper
 
     def upsert(self, paper_create: PaperCreate) -> Paper:
-        # Check if paper already exists
         existing_paper = self.get_by_arxiv_id(paper_create.arxiv_id)
         if existing_paper:
-            # Update existing paper with new content
             for key, value in paper_create.model_dump(exclude_unset=True).items():
                 setattr(existing_paper, key, value)
             return self.update(existing_paper)
         else:
-            # Create new paper
             return self.create(paper_create)
 
     def delete(self, paper: Paper) -> None:
         """Hard-delete a paper record from Postgres.
-     
-            Caller is responsible for cleaning up OpenSearch chunks and
-            any files on disk before calling this.
-         
-            :param paper: Paper ORM instance to delete
+
+        Caller is responsible for cleaning up OpenSearch chunks and
+        any files on disk before calling this.
+
+        :param paper: Paper ORM instance to delete
         """
         self.session.delete(paper)
         self.session.commit()

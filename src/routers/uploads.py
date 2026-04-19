@@ -32,7 +32,13 @@ from src.schemas.api.upload import (
     UploadStatusResponse,
 )
 from src.services.indexing.factory import make_hybrid_indexing_service
-from src.services.paper_upload_pipeline import TASK_TTL_SECONDS, _write_task_state, read_task_state, run_upload_pipeline
+from src.services.paper_upload_pipeline import (
+    TASK_TTL_SECONDS,
+    UPLOAD_DIR,
+    _write_task_state,
+    read_task_state,
+    run_upload_pipeline,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +50,6 @@ router = APIRouter(prefix="/uploads", tags=["uploads"])
 
 MAX_UPLOAD_SIZE_BYTES = 20 * 1024 * 1024  # 20 MB — matches PDFParserSettings
 ALLOWED_CONTENT_TYPES = {"application/pdf", "application/x-pdf"}
-UPLOAD_DIR = Path("data/user_uploads")
 
 
 # ---------------------------------------------------------------------------

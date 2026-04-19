@@ -32,6 +32,13 @@ logger = logging.getLogger(__name__)
 # 24 hours is enough for any client to poll — after that, use paper_id directly.
 TASK_TTL_SECONDS = 86_400
 
+# Absolute path to the uploads directory inside the container.
+# Using an absolute path ensures that pdf_url stored in Postgres is always
+# resolvable regardless of the process working directory at serve time.
+# The compose.yml api service mounts a named volume at this exact path so
+# files survive container restarts.
+UPLOAD_DIR = Path("/app/data/user_uploads")
+
 
 # ---------------------------------------------------------------------------
 # Redis task-state helpers
@@ -68,15 +75,22 @@ def save_upload_to_disk(file_bytes: bytes, upload_dir: Path) -> Path:
     avoid path-traversal issues and name collisions.  The original name is
     stored in Postgres (Paper.original_filename) for display purposes only.
 
+    The returned path is always absolute (resolved) so that the value stored
+    in ``Paper.pdf_url`` is unambiguous regardless of the process working
+    directory at the time of the call.
+
     :param file_bytes: Raw PDF bytes from the multipart upload
     :param upload_dir: Directory to write into (created if missing)
     :returns: Absolute path to the saved file
     """
+    # Resolve to absolute once — guards against relative paths being passed in.
+    upload_dir = upload_dir.resolve()
     upload_dir.mkdir(parents=True, exist_ok=True)
+
     dest = upload_dir / f"{uuid.uuid4()}.pdf"
     dest.write_bytes(file_bytes)
     logger.info(f"Saved upload to {dest} ({len(file_bytes):,} bytes)")
-    return dest
+    return dest  # already absolute because upload_dir was resolved
 
 
 # ---------------------------------------------------------------------------
@@ -169,7 +183,7 @@ async def run_upload_pipeline(
             abstract=abstract,
             categories=categories,
             published_date=published_date,
-            pdf_url=str(pdf_path),  # local path acts as the PDF URL for uploads
+            pdf_url=str(pdf_path),  # absolute path — safe to use directly at serve time
             # Parsed content
             raw_text=pdf_content.raw_text if pdf_content else None,
             sections=([s.model_dump() for s in pdf_content.sections] if pdf_content and pdf_content.sections else None),
@@ -184,7 +198,7 @@ async def run_upload_pipeline(
         db.commit()
         db.refresh(paper)
 
-        logger.info(f"[{task_id}] Created Paper record: {paper.id}")
+        logger.info(f"[{task_id}] Created Paper record: {paper.id}, pdf_url={paper.pdf_url}")
         await _update(
             {
                 "paper_id": str(paper.id),

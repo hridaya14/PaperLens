@@ -49,16 +49,16 @@ export function MindMapDialog({
   open,
   onOpenChange,
 }: MindMapDialogProps) {
-  const arxivId = paper?.arxiv_id ?? null;
+  const paperRef = paper?.arxiv_id ?? paper?.id ?? null;
   const mindMapQuery = useQuery({
-    queryKey: ["mindmap", arxivId],
+    queryKey: ["mindmap", paperRef],
     queryFn: () => {
-      if (!arxivId) {
-        return Promise.reject(new Error("Missing arXiv ID"));
+      if (!paperRef) {
+        return Promise.reject(new Error("Missing paper reference"));
       }
-      return getMindMap(arxivId);
+      return getMindMap(paperRef);
     },
-    enabled: open && Boolean(arxivId),
+    enabled: open && Boolean(paperRef),
   });
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -188,12 +188,7 @@ export function MindMapDialog({
           </div>
 
           <div className="relative min-h-[560px] flex-1">
-            {!paper?.arxiv_id ? (
-              <div className="flex h-full items-center justify-center px-8 text-center text-sm text-white/65">
-                Mind maps are only available for arXiv-sourced papers. Uploads
-                can still be read in the PDF viewer.
-              </div>
-            ) : mindMapQuery.isLoading ? (
+            {mindMapQuery.isLoading ? (
               <div className="flex h-full items-center justify-center text-sm text-white/65">
                 Generating mind map. First load can take a little while.
               </div>
