@@ -30,6 +30,8 @@ services:
       - rag-network
     volumes:
       - user_uploads:/app/data/user_uploads
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     develop:
       watch:
         - action: sync

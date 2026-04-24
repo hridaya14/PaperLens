@@ -24,13 +24,15 @@ class NvidiaClient:
     def __init__(self):
         """Initialize OpenAI client with NVIDIA endpoint and API key."""
         settings = get_settings()
-        self.client = OpenAI(api_key=settings.nvidia_api_key, base_url=settings.nvidia_base_url)
+        api_key = settings.nvidia_api_key if settings.llm_mode == "nvidia" else settings.local_llm_api_key
+        base_url = settings.nvidia_base_url if settings.llm_mode == "nvidia" else settings.local_llm_server
+        self.client = OpenAI(api_key=api_key, base_url=base_url)
         self.prompt_builder = RAGPromptBuilder()
         self.response_parser = ResponseParser()
         self.mindmap_prompt_builder = MindMapPromptBuilder()
         self.flashcard_prompt_builder = FlashcardPromptBuilder()
         self.timeout = float(settings.nvidia_timeout)
-        self.default_model = "meta/llama-3.3-70b-instruct"
+        self.default_model = "meta/llama-3.3-70b-instruct" if settings.llm_mode == "nvidia" else "qwen/qwen3.5-9b"
 
     def health_check(self) -> Dict[str, Any]:
         """Check if NVIDIA LLM endpoint is reachable."""

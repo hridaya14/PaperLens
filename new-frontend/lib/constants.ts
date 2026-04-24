@@ -18,7 +18,10 @@ export const AVAILABLE_CATEGORIES = Object.entries(CATEGORY_LABELS).map(
 );
 
 export const RESULT_LIMITS = [10, 20, 50] as const;
-export const CHAT_MODELS = ["meta/llama-3.3-70b-instruct"] as const;
+export const CHAT_MODELS = [
+  "meta/llama-3.3-70b-instruct",
+  "qwen/qwen3.5-9b",
+] as const;
 
 export const NAV_ITEMS = [
   { href: "/", label: "Overview" },

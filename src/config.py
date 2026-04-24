@@ -1,7 +1,6 @@
-from typing import List
 import os
 from pathlib import Path
-from typing import Literal
+from typing import List, Literal
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -12,11 +11,7 @@ ENV_FILE_PATH = PROJECT_ROOT / ".env"
 
 class BaseConfigSettings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=[".env", str(ENV_FILE_PATH)],
-        extra="ignore",
-        frozen=True,
-        env_nested_delimiter="__",
-        case_sensitive=False
+        env_file=[".env", str(ENV_FILE_PATH)], extra="ignore", frozen=True, env_nested_delimiter="__", case_sensitive=False
     )
 
 
@@ -135,6 +130,9 @@ class Settings(BaseConfigSettings):
     nvidia_api_key: str = ""
     nvidia_base_url: str = ""
     nvidia_timeout: int = 300
+    llm_mode: str = "local"
+    local_llm_server: str = "http://localhost:1234/v1"
+    local_llm_api_key: str = ""
 
     # Embeddings config (JinaAI)
     jina_api_key: str = ""
@@ -155,8 +153,7 @@ class Settings(BaseConfigSettings):
     @classmethod
     def validate_database_url(cls, v: str) -> str:
         if not (v.startswith("postgresql://") or v.startswith("postgresql+psycopg2://")):
-            raise ValueError(
-                "Database URL must start with 'postgresql://' or 'postgresql+psycopg2://'")
+            raise ValueError("Database URL must start with 'postgresql://' or 'postgresql+psycopg2://'")
         return v
 
 
