@@ -5,8 +5,10 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, ValidationError
-from src.schemas.nvidia import RAGResponse
+from pydantic import BaseModel, Field, ValidationError
+
+MAX_CHARS_PER_CHUNK = 800  # ~200 tokens per chunk
+MAX_TOTAL_CHARS = 2400  # hard ceiling across all chunks
 
 
 class Confidence(str, Enum):
@@ -15,11 +17,44 @@ class Confidence(str, Enum):
     high = "high"
 
 
+class LLMMetrics(BaseModel):
+    total_ms: float = Field(..., description="Total LLM latency (ms)")
+    llm_ms: float = Field(..., description="Model inference latency (ms)")
+    ttft_ms: Optional[float] = Field(None, description="Time to first token (ms)")
+
+    input_tokens: Optional[int] = None
+    output_tokens: Optional[int] = None
+
+    tokens_per_sec: Optional[float] = None
+
+
 class LLMResponse(BaseModel):
     answer: str
     sources: list[str]
     confidence: Optional[Confidence]
     citations: Optional[list[str]]
+
+    metrics: Optional[LLMMetrics] = None
+
+
+class RAGResponse(BaseModel):
+    """Structured response model for RAG queries."""
+
+    answer: str = Field(description="Comprehensive answer based on the provided paper excerpts")
+    sources: List[str] = Field(
+        default_factory=list,
+        description="List of PDF URLs from papers used in the answer",
+    )
+    confidence: Optional[str] = Field(
+        default=None,
+        description="Confidence level: high, medium, or low based on excerpt relevance",
+    )
+    citations: Optional[List[str]] = Field(
+        default=None,
+        description="Specific arXiv IDs or paper titles referenced in the answer",
+    )
+
+    metrics: Optional[LLMMetrics] = None
 
 
 class UnstructuredResponse(BaseModel):
@@ -54,31 +89,28 @@ class RAGPromptBuilder:
         return prompt_file.read_text().strip()
 
     def create_rag_prompt(self, query: str, chunks: List[Dict[str, Any]]) -> str:
-        """Create a RAG prompt with query and retrieved chunks.
-
-        Args:
-            query: User's question
-            chunks: List of retrieved chunks with metadata from OpenSearch
-
-        Returns:
-            Formatted prompt string
-        """
         prompt = f"{self.system_prompt}\n\n"
-        prompt += "### Context from Papers (do NOT imitate formatting):\n\n"
+        prompt += "### Context from Papers:\n\n"
 
+        total_chars = 0
         for i, chunk in enumerate(chunks, 1):
-            # Get the actual chunk text
             chunk_text = chunk.get("chunk_text", chunk.get("content", ""))
             arxiv_id = chunk.get("arxiv_id", "")
 
+            # Truncate individual chunk
+            if len(chunk_text) > MAX_CHARS_PER_CHUNK:
+                chunk_text = chunk_text[:MAX_CHARS_PER_CHUNK] + "..."
+
+            # Stop adding chunks if total budget exceeded
+            if total_chars + len(chunk_text) > MAX_TOTAL_CHARS:
+                break
+
             prompt += f"[Source {i} — arXiv:{arxiv_id}]\n"
-            prompt += "```text\n"
-            prompt += f"{chunk_text}\n"
-            prompt += "```\n\n"
+            prompt += f"{chunk_text}\n\n"  # no code fences
+            total_chars += len(chunk_text)
 
         prompt += f"### Question:\n{query}\n\n"
         prompt += "### Answer (cite sources using [arXiv:id] format):\n"
-
         return prompt
 
     def create_structured_prompt(self, query: str, chunks: List[Dict[str, Any]]) -> Dict[str, Any]:

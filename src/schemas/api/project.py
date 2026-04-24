@@ -8,7 +8,6 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-
 # ---------------------------------------------------------------------------
 # Paper summary (used inside project source lists)
 # ---------------------------------------------------------------------------
@@ -18,7 +17,7 @@ class ProjectPaperSummary(BaseModel):
     """Lightweight paper card — enough for the frontend source panel."""
 
     id: UUID
-    source: str                               # "arxiv" | "user_upload"
+    source: str  # "arxiv" | "user_upload"
     arxiv_id: Optional[str] = None
     original_filename: Optional[str] = None
     title: str
@@ -145,3 +144,4 @@ class ProjectAskResponse(BaseModel):
     project_id: UUID
     user_message_id: UUID
     assistant_message_id: UUID
+    metrics: Optional[Dict[str, Any]] = None

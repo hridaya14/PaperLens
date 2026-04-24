@@ -1,25 +1,22 @@
 """
 Shared RAG service.
 
-Extracted from ask.py so that the projects router, the chat sessions router,
-and the legacy /ask endpoint all use identical retrieval and execution logic.
-
-Nothing in here imports from FastAPI — pure service code.
+Pure service layer (no FastAPI imports).
+Handles retrieval + LLM execution + streaming.
 """
 
+import asyncio
 import logging
 import uuid as uuid_lib
-from typing import Any, Callable, Dict, Generator, List, Optional, Tuple
+from typing import Any, AsyncGenerator, Callable, Dict, List, Optional, Tuple
 
 from sqlalchemy.orm import Session
 from src.repositories.project import ProjectRepository
-from src.services.embeddings.jina_client import JinaEmbeddingsClient
 from src.services.embeddings.nvidia_client import NIMEmbeddingsClient
 from src.services.opensearch.client import OpenSearchClient
 
 logger = logging.getLogger(__name__)
 
-# How many recent messages to include as conversation context for the LLM.
 HISTORY_CONTEXT_LIMIT = 10
 
 
@@ -29,15 +26,6 @@ HISTORY_CONTEXT_LIMIT = 10
 
 
 def build_source_url(arxiv_id: str) -> str:
-    """
-    Return the correct PDF URL for a chunk's arxiv_id field.
-
-    arxiv papers  → public arxiv PDF URL
-    user uploads  → local serve endpoint (arxiv_id field contains a UUID string)
-
-    The distinction is reliable: real arxiv IDs (e.g. "2401.12345") never
-    parse as valid UUIDs.
-    """
     try:
         uuid_lib.UUID(arxiv_id)
         return f"/api/v1/uploads/{arxiv_id}/pdf"
@@ -55,12 +43,6 @@ def resolve_paper_ids(
     project_id: Optional[uuid_lib.UUID],
     db: Session,
 ) -> Optional[List[str]]:
-    """
-    Return paper UUID strings for a project, or None for global search.
-
-    Raises ValueError if the project doesn't exist or has no sources.
-    Callers convert this to HTTPException with the appropriate status code.
-    """
     if project_id is None:
         return None
 
@@ -73,7 +55,7 @@ def resolve_paper_ids(
     paper_ids = repo.get_paper_ids_for_project(project_id)
 
     if not paper_ids:
-        raise ValueError(f"Project '{project_id}' has no sources. Add papers to the project before querying.")
+        raise ValueError(f"Project '{project_id}' has no sources.")
 
     logger.info(f"Project scoping: restricting search to {len(paper_ids)} papers")
     return paper_ids
@@ -85,12 +67,6 @@ def resolve_paper_ids(
 
 
 def build_context_query(query: str, history: List[Any]) -> str:
-    """
-    Prepend recent conversation history to the user query.
-
-    Works with both ProjectChatMessage and ChatMessage ORM objects — both
-    have .role and .content. Returns the query unchanged when history is empty.
-    """
     if not history:
         return query
 
@@ -105,7 +81,7 @@ def build_context_query(query: str, history: List[Any]) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Core retrieval
+# Retrieval
 # ---------------------------------------------------------------------------
 
 
@@ -118,11 +94,7 @@ async def prepare_chunks_and_sources(
     categories: Optional[List[str]] = None,
     paper_ids: Optional[List[str]] = None,
 ) -> Tuple[List[Dict], List[str], str]:
-    """
-    Core RAG retrieval — fetch chunks from OpenSearch and build source URLs.
 
-    Returns (chunks, sources, search_mode).
-    """
     query_embedding = None
     search_mode = "bm25"
 
@@ -131,13 +103,16 @@ async def prepare_chunks_and_sources(
             query_embedding = await embeddings_service.embed_query(query)
             search_mode = "hybrid"
         except Exception as e:
-            logger.warning(f"Embedding failed, falling back to BM25: {e}")
+            logger.warning(f"Embedding failed → fallback BM25: {e}")
             query_embedding = None
             search_mode = "bm25"
 
     logger.info(f"Retrieving top {top_k} chunks — mode={search_mode}, scoped={bool(paper_ids)}")
 
-    search_results = opensearch_client.search_unified(
+    # FIX: search_unified is a sync/blocking call. Run it in a thread pool so
+    # it doesn't block the event loop while waiting on the OpenSearch network round trip.
+    search_results = await asyncio.to_thread(
+        opensearch_client.search_unified,
         query=query,
         query_embedding=query_embedding,
         size=top_k,
@@ -149,17 +124,19 @@ async def prepare_chunks_and_sources(
     )
 
     chunks: List[Dict] = []
-    seen_sources: set = set()
     sources: List[str] = []
+    seen_sources = set()
 
     for hit in search_results.get("hits", []):
         arxiv_id = hit.get("arxiv_id", "")
+
         chunks.append(
             {
                 "arxiv_id": arxiv_id,
                 "chunk_text": hit.get("chunk_text", hit.get("abstract", "")),
             }
         )
+
         if arxiv_id and arxiv_id not in seen_sources:
             seen_sources.add(arxiv_id)
             sources.append(build_source_url(arxiv_id))
@@ -168,65 +145,110 @@ async def prepare_chunks_and_sources(
 
 
 # ---------------------------------------------------------------------------
-# LLM execution — shared between ask and stream routers
+# LLM execution (NON-STREAM)
 # ---------------------------------------------------------------------------
 
 
-def run_rag_ask(
+async def run_rag_ask(
     context_query: str,
     chunks: List[Dict],
     model: str,
     nvidia_client: Any,
     save_message: Callable[[str, str], Any],
-) -> Tuple[str, Any]:
+) -> Tuple[Dict[str, Any], Any]:
     """
-    Execute a non-streaming LLM RAG call and persist the assistant response.
+    Async wrapper around the sync nvidia_client call.
 
-    :param context_query: Query string (may include prepended history)
-    :param chunks: Retrieved chunks from OpenSearch
-    :param model: LLM model identifier
-    :param nvidia_client: NvidiaClient instance
-    :param save_message: Callable(role, content) → persisted message ORM object.
-                         Abstracts over ProjectRepository.add_chat_message and
-                         ChatRepository.add_message so this function stays
-                         repo-agnostic.
-    :returns: (answer_text, assistant_message_orm)
+    FIX: previously called synchronously inside async endpoints, blocking the
+    event loop for the full LLM round trip (~14s). asyncio.to_thread() offloads
+    the blocking HTTP call to a thread pool, freeing the loop for other requests.
+
+    Returns:
+        ({"answer": str, "metrics": {...}}, assistant_msg)
     """
-    rag_response = nvidia_client.generate_rag_answer(query=context_query, chunks=chunks, model=model)
-    answer = rag_response.get("answer", "Unable to generate answer.")
+    rag_response = await asyncio.to_thread(
+        nvidia_client.generate_rag_answer,
+        query=context_query,
+        chunks=chunks,
+        model=model,
+    )
+
+    if isinstance(rag_response, dict):
+        answer = rag_response.get("answer", "Unable to generate answer.")
+        metrics = rag_response.get("metrics") or {}
+    else:
+        answer = rag_response
+        metrics = {}
+
     assistant_msg = save_message("assistant", answer)
-    return answer, assistant_msg
+
+    return {"answer": answer, "metrics": metrics}, assistant_msg
 
 
-def iter_rag_stream(
+# ---------------------------------------------------------------------------
+# LLM execution (STREAM)
+# ---------------------------------------------------------------------------
+
+
+async def iter_rag_stream(
     context_query: str,
     chunks: List[Dict],
     model: str,
     nvidia_client: Any,
     save_message: Callable[[str, str], Any],
-) -> Generator[Tuple[Optional[str], Optional[str], Any], None, None]:
+) -> AsyncGenerator[Tuple[Optional[str], Optional[str], Any, Optional[Dict]], None]:
     """
-    Sync generator that drives the streaming LLM call and persists the result.
+    Async generator that offloads the blocking sync generator to a thread pool
+    via a queue, so the event loop is never blocked between token yields.
 
-    Yields two kinds of tuples:
-      (text_chunk, None,          None)          — for each token received
-      (None,       full_response, assistant_msg) — once, when stream is done
+    FIX: the previous sync generator called nvidia_client (a blocking HTTP
+    stream) directly inside an async for loop, stalling the event loop on every
+    chunk. The queue bridge below keeps the loop free — the thread feeds tokens
+    in, the async generator drains them out.
 
-    Using a sync generator (not async) because NvidiaClient.generate_rag_answer_stream
-    returns a plain Generator. Routers iterate this with a regular `for` loop
-    inside their async `generate_stream` function — FastAPI handles the mix correctly.
-
-    :param save_message: Callable(role, content) → persisted message ORM object.
+    Yields:
+      (text_chunk, None,          None,           None)     — streaming tokens
+      (None,       full_response, assistant_msg,  metrics)  — final summary
     """
     full_response = ""
+    final_metrics: Dict[str, Any] = {}
+    queue: asyncio.Queue = asyncio.Queue()
+    loop = asyncio.get_event_loop()
 
-    for chunk in nvidia_client.generate_rag_answer_stream(query=context_query, chunks=chunks, model=model):
-        if chunk.get("response"):
-            text_chunk = chunk["response"]
-            full_response += text_chunk
-            yield text_chunk, None, None
+    def _run_sync():
+        try:
+            for chunk in nvidia_client.generate_rag_answer_stream(
+                query=context_query,
+                chunks=chunks,
+                model=model,
+            ):
+                loop.call_soon_threadsafe(queue.put_nowait, chunk)
+        except Exception as exc:
+            loop.call_soon_threadsafe(queue.put_nowait, exc)
+        finally:
+            loop.call_soon_threadsafe(queue.put_nowait, None)  # sentinel
 
-        if chunk.get("done", False):
-            assistant_msg = save_message("assistant", full_response)
-            yield None, full_response, assistant_msg
+    # Run the blocking generator in a thread pool without awaiting it —
+    # we drain the queue concurrently below.
+    asyncio.get_event_loop().run_in_executor(None, _run_sync)
+
+    while True:
+        item = await queue.get()
+
+        if item is None:
+            # Sentinel — generator exhausted
             break
+
+        if isinstance(item, Exception):
+            raise item
+
+        if item.get("response") is not None:
+            text_chunk = item["response"]
+            full_response += text_chunk
+            yield text_chunk, None, None, None
+
+        elif item.get("metrics") is not None:
+            final_metrics = item["metrics"]
+
+    assistant_msg = save_message("assistant", full_response)
+    yield None, full_response, assistant_msg, final_metrics

@@ -3,11 +3,10 @@ Pydantic schemas for the general chat sessions API.
 """
 
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
-
 
 # ---------------------------------------------------------------------------
 # Message schemas
@@ -34,7 +33,7 @@ class ChatSessionResponse(BaseModel):
     """Lean session — for list views. No messages included."""
 
     id: UUID
-    title: Optional[str] = None      # None until first message
+    title: Optional[str] = None  # None until first message
     message_count: int = 0
     created_at: datetime
     updated_at: datetime
@@ -83,3 +82,4 @@ class SessionAskResponse(BaseModel):
     session_id: UUID
     user_message_id: UUID
     assistant_message_id: UUID
+    metrics: Optional[Dict[str, Any]] = None

@@ -196,20 +196,22 @@ async def session_ask(
             session_id=sid,
             user_message_id=user_msg.id,
             assistant_message_id=assistant_msg.id,
+            metrics={},
         )
 
     save_message = lambda role, content: repo.add_message(sid, role=role, content=content)
-    answer, assistant_msg = run_rag_ask(context_query, chunks, body.model, nvidia_client, save_message)
+    result, assistant_msg = await run_rag_ask(context_query, chunks, body.model, nvidia_client, save_message)
 
     return SessionAskResponse(
         query=body.query,
-        answer=answer,
+        answer=result["answer"],
         sources=sources,
         chunks_used=len(chunks),
         search_mode=search_mode,
         session_id=sid,
         user_message_id=user_msg.id,
         assistant_message_id=assistant_msg.id,
+        metrics=result.get("metrics", {}),
     )
 
 
@@ -251,18 +253,18 @@ async def session_stream(
         if not chunks:
             answer = "I couldn't find any relevant information in the indexed papers."
             assistant_msg = save_message("assistant", answer)
-            yield f"data: {json.dumps({'answer': answer, 'sources': [], 'done': True, 'user_message_id': str(user_msg.id), 'assistant_message_id': str(assistant_msg.id)})}\n\n"
+            yield f"data: {json.dumps({'answer': answer, 'sources': [], 'done': True, 'metrics': {}, 'user_message_id': str(user_msg.id), 'assistant_message_id': str(assistant_msg.id)})}\n\n"
             return
 
         yield f"data: {json.dumps({'sources': sources, 'chunks_used': len(chunks), 'search_mode': search_mode, 'session_id': str(sid), 'user_message_id': str(user_msg.id)})}\n\n"
 
-        for text_chunk, full_response, assistant_msg in iter_rag_stream(
+        async for text_chunk, full_response, assistant_msg, metrics in iter_rag_stream(
             context_query, chunks, body.model, nvidia_client, save_message
         ):
             if text_chunk is not None:
                 yield f"data: {json.dumps({'chunk': text_chunk})}\n\n"
             elif full_response is not None:
-                yield f"data: {json.dumps({'answer': full_response, 'done': True, 'assistant_message_id': str(assistant_msg.id)})}\n\n"
+                yield f"data: {json.dumps({'answer': full_response, 'done': True, 'metrics': metrics or {}, 'assistant_message_id': str(assistant_msg.id)})}\n\n"
 
     return StreamingResponse(
         generate_stream(),
