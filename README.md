@@ -24,7 +24,7 @@
     <a href="https://github.com/othneildrew/Best-README-Template"><strong>Explore the docs »</strong></a>
     <br />
     <br />
-    <a href="https://github.com/hridaya14/PaperLens](https://steadier-prankish-remedy.ngrok-free.dev">View Demo</a>
+    <a href="https://steadier-prankish-remedy.ngrok-free.dev">View Demo</a>
     &middot;
     <a href="https://github.com/hridaya14/PaperLens/issues/new?labels=bug&template=bug-report---.md">Report Bug</a>
     &middot;
