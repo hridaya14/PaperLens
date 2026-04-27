@@ -17,7 +17,7 @@ class NIMEmbeddingsClient:
         self,
         api_key: str,
         base_url: str = "https://integrate.api.nvidia.com/v1",
-        model: str = "nvidia/llama-3.2-nemoretriever-1b-vlm-embed-v1",
+        model: str = "nvidia/llama-3.2-nemoretriever-300m-embed-v1",
         embedding_dim: Optional[int] = None,
         max_workers: int = 4,
     ):
