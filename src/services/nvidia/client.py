@@ -4,7 +4,8 @@ import time
 import traceback
 from typing import Any, Dict, Generator, List, Optional
 
-from openai import APIConnectionError, APITimeoutError, OpenAI, OpenAIError
+from openai import APIConnectionError, APITimeoutError, OpenAIError
+from langfuse.openai import OpenAI
 from src.config import get_settings
 from src.exceptions import OllamaConnectionError, OllamaException, OllamaTimeoutError
 from src.schemas.nvidia import RAGResponse

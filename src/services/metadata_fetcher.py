@@ -437,7 +437,7 @@ class MetadataFetcher:
 
             except Exception as e:
                 logger.error(f"Failed to store paper {paper.arxiv_id}: {e}")
-                db_session.rollback()  # 🔴 REQUIRED
+                db_session.rollback()
                 continue
         # Commit all changes
         try:

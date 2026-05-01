@@ -4,6 +4,7 @@ from collections import defaultdict
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from langfuse import Langfuse
 
 from pydantic import BaseModel, Field, ValidationError
 
@@ -78,15 +79,19 @@ class RAGPromptBuilder:
         Returns:
             System prompt string
         """
-        prompt_file = self.prompts_dir / "rag_system.txt"
-        if not prompt_file.exists():
-            # Fallback to default prompt if file doesn't exist
-            return (
-                "You are an AI assistant specialized in answering questions about "
-                "academic papers from arXiv. Base your answer STRICTLY on the provided "
-                "paper excerpts."
-            )
-        return prompt_file.read_text().strip()
+        langfuse = Langfuse()
+        prompt = langfuse.get_prompt("System Prompt", label="production")
+        return prompt
+
+        # prompt_file = self.prompts_dir / "rag_system.txt"
+        # if not prompt_file.exists():
+        #     # Fallback to default prompt if file doesn't exist
+        #     return (
+        #         "You are an AI assistant specialized in answering questions about "
+        #         "academic papers from arXiv. Base your answer STRICTLY on the provided "
+        #         "paper excerpts."
+        #     )
+        # return prompt_file.read_text().strip()
 
     def create_rag_prompt(self, query: str, chunks: List[Dict[str, Any]]) -> str:
         prompt = f"{self.system_prompt}\n\n"

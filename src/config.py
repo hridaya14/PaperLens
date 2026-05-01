@@ -137,6 +137,11 @@ class Settings(BaseConfigSettings):
     # Embeddings config (JinaAI)
     jina_api_key: str = ""
 
+    # Langfuse configuration
+    langfuse_public_key: str = ""
+    langfuse_secret_key: str = ""
+    langfuse_host: str = ""
+
     # arXiv settings
     arxiv: ArxivSettings = Field(default_factory=ArxivSettings)
 
