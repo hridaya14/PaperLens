@@ -1,0 +1,81 @@
+{
+  "generated_at": "2026-03-24T22:32:34.898043",
+  "api_url": "http://localhost:8000/api/v1",
+  "dry_run": false,
+  "strategies": [
+    "bm25",
+    "hybrid"
+  ],
+  "k_values": [
+    1,
+    3,
+    5,
+    10
+  ],
+  "metrics": {
+    "bm25": {
+      "precision@1": 1.0,
+      "precision@3": 1.0,
+      "precision@5": 1.0,
+      "precision@10": 0.995,
+      "recall@1": 0.05149999999999998,
+      "recall@3": 0.1545,
+      "recall@5": 0.2575,
+      "recall@10": 0.505,
+      "ndcg@1": 1.0,
+      "ndcg@3": 1.0,
+      "ndcg@5": 1.0,
+      "ndcg@10": 1.0,
+      "mrr@1": 1.0,
+      "mrr@3": 1.0,
+      "mrr@5": 1.0,
+      "mrr@10": 1.0,
+      "hit_rate@1": 1.0,
+      "hit_rate@3": 1.0,
+      "hit_rate@5": 1.0,
+      "hit_rate@10": 1.0
+    },
+    "hybrid": {
+      "precision@1": 0.97,
+      "precision@3": 0.9466666666666665,
+      "precision@5": 0.934,
+      "precision@10": 0.914,
+      "recall@1": 0.04999999999999999,
+      "recall@3": 0.145,
+      "recall@5": 0.23800000000000002,
+      "recall@10": 0.4645,
+      "ndcg@1": 0.97,
+      "ndcg@3": 0.9517319681505688,
+      "ndcg@5": 0.9417701185329196,
+      "ndcg@10": 0.9281695293944762,
+      "mrr@1": 0.97,
+      "mrr@3": 0.985,
+      "mrr@5": 0.985,
+      "mrr@10": 0.985,
+      "hit_rate@1": 0.97,
+      "hit_rate@3": 1.0,
+      "hit_rate@5": 1.0,
+      "hit_rate@10": 1.0
+    }
+  },
+  "latency_ms": {
+    "bm25": {
+      "p50": 48.1,
+      "p95": 64.3,
+      "p99": 82.1,
+      "mean": 47.5,
+      "min": 11.5,
+      "max": 82.1,
+      "count": 100
+    },
+    "hybrid": {
+      "p50": 275.7,
+      "p95": 422.5,
+      "p99": 958.4,
+      "mean": 296.4,
+      "min": 232.9,
+      "max": 958.4,
+      "count": 100
+    }
+  }
+}

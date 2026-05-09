@@ -1,0 +1,104 @@
+@import "@xyflow/react/dist/style.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 164 22% 8%;
+  --foreground: 40 30% 93%;
+  --card: 162 18% 11%;
+  --card-foreground: 40 30% 93%;
+  --popover: 162 18% 10%;
+  --popover-foreground: 40 30% 93%;
+  --primary: 36 80% 61%;
+  --primary-foreground: 164 22% 8%;
+  --secondary: 162 13% 17%;
+  --secondary-foreground: 40 24% 92%;
+  --muted: 162 12% 14%;
+  --muted-foreground: 38 12% 67%;
+  --accent: 32 76% 58%;
+  --accent-foreground: 164 22% 8%;
+  --border: 162 10% 22%;
+  --input: 162 12% 18%;
+  --ring: 28 68% 53%;
+  --success: 148 51% 39%;
+  --danger: 357 66% 56%;
+}
+
+* {
+  @apply border-border;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply min-h-screen bg-background font-sans text-foreground antialiased;
+  background-image:
+    radial-gradient(circle at 12% 0%, rgba(226, 159, 78, 0.18), transparent 26%),
+    radial-gradient(circle at 84% 10%, rgba(59, 140, 121, 0.12), transparent 28%),
+    linear-gradient(180deg, rgba(11, 17, 15, 0.98), rgba(14, 22, 20, 0.98));
+}
+
+a {
+  @apply text-inherit no-underline;
+}
+
+::selection {
+  background: rgba(255, 176, 79, 0.24);
+}
+
+.panel-surface {
+  @apply rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(21,30,27,0.96),rgba(16,23,21,0.92))] shadow-2xl backdrop-blur-xl;
+}
+
+.panel-dark {
+  @apply rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(14,20,18,0.98),rgba(10,15,14,0.96))] text-white shadow-2xl;
+}
+
+.eyebrow {
+  @apply inline-flex items-center gap-2 rounded-full border border-amber-300/25 bg-amber-300/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-amber-200;
+}
+
+.grid-paper {
+  background-image: radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.08) 1px, transparent 0);
+  background-size: 18px 18px;
+}
+
+.prose-markdown {
+  @apply space-y-4 text-sm leading-7 text-stone-200;
+}
+
+.prose-markdown a {
+  @apply text-amber-200 underline decoration-amber-400/40 underline-offset-4;
+}
+
+.prose-markdown strong {
+  @apply font-semibold text-white;
+}
+
+.field-surface {
+  @apply border border-white/10 bg-[rgba(17,24,22,0.96)] text-white;
+  color-scheme: dark;
+}
+
+.field-surface::placeholder {
+  color: rgba(255, 255, 255, 0.38);
+}
+
+.field-surface option {
+  background-color: rgb(17, 24, 22);
+  color: rgb(243, 239, 230);
+}
+
+.field-surface:-webkit-autofill,
+.field-surface:-webkit-autofill:hover,
+.field-surface:-webkit-autofill:focus,
+.field-surface:-webkit-autofill:active {
+  -webkit-text-fill-color: rgb(243, 239, 230);
+  box-shadow: 0 0 0 1000px rgb(17, 24, 22) inset;
+  transition: background-color 9999s ease-in-out 0s;
+  caret-color: rgb(243, 239, 230);
+}

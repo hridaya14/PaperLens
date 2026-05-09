@@ -1,7 +1,10 @@
 from __future__ import annotations
-from pydantic import BaseModel
-from typing import Literal
+
 from datetime import datetime
+from typing import Literal
+
+from pydantic import BaseModel
+
 
 class MindMapNode(BaseModel):
     id: str
@@ -17,7 +20,7 @@ class MindMapNode(BaseModel):
         "contribution",
     ]
     importance: Literal["primary", "secondary", "tertiary"]
-    source_section: str | None = None    # populated from chunk section_title
+    source_section: str | None = None  # populated from chunk section_title
     children: list[MindMapNode] = []
 
     model_config = {"arbitrary_types_allowed": True}
@@ -28,10 +31,10 @@ MindMapNode.model_rebuild()
 
 class MindMap(BaseModel):
     paper_id: str
-    arxiv_id: str
+    arxiv_id: str | None = None
     paper_title: str
     root: MindMapNode
-    sections_covered: list[str]          # which section_titles were present in chunks
+    sections_covered: list[str]  # which section_titles were present in chunks
     generated_at: datetime
     model_used: str
 

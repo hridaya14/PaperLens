@@ -22,7 +22,8 @@ dependencies = [
     "mcp>=1.13.1",
     "openai",
     "alembic>=1.13.3",
-    "redis[asyncio]>=5.0.0"
+    "redis[asyncio]>=5.0.0",
+    "langfuse",
 ]
 
 [dependency-groups]
