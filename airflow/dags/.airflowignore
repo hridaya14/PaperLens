@@ -1,0 +1,5 @@
+# Airflow scans all .py files in the dags folder, including subdirectories.
+# The arxiv_ingestion/ directory is a Python package (module), not a DAGs folder.
+# Ignoring it prevents Airflow from trying to parse fetching.py, filtering.py,
+# etc. as DAG files, which would cause relative import errors.
+arxiv_ingestion/

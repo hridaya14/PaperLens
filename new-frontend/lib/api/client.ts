@@ -1,11 +1,14 @@
 import { z } from "zod";
 import {
+    activateProfileResponseSchema,
     addProjectSourceResponseSchema,
     askResponseSchema,
     chatRequestSchema,
     chatSessionDetailSchema,
     chatSessionSchema,
     createProjectSchema,
+    decisionStatsResponseSchema,
+    filterDecisionListResponseSchema,
     flashcardSetSchema,
     mindMapSchema,
     paperSearchResponseSchema,
@@ -13,12 +16,17 @@ import {
     projectChatHistorySchema,
     projectDetailSchema,
     projectSummarySchema,
+    recomputeVectorResponseSchema,
     renameSessionSchema,
+    scopeProfileListResponseSchema,
+    scopeProfileSchema,
     sessionAskResponseSchema,
     uploadAcceptedSchema,
     uploadStatusSchema,
     uploadedPaperSchema,
     type ChatRequest,
+    type ScopeProfileCreate,
+    type ScopeProfileUpdate,
 } from "@/lib/schemas";
 import { buildQueryString } from "@/lib/utils";
 
@@ -311,6 +319,94 @@ export async function postChatStream(
 
     return ensureStreamingResponse(response);
 }
+
+// ---------------------------------------------------------------------------
+// Scope profiles
+// ---------------------------------------------------------------------------
+
+export async function listScopeProfiles() {
+    const response = await fetch("/api/scope-profiles", {
+        cache: "no-store",
+    });
+
+    return readClientJson(response, scopeProfileListResponseSchema);
+}
+
+export async function getScopeProfile(profileId: string) {
+    const response = await fetch(`/api/scope-profiles/${profileId}`, {
+        cache: "no-store",
+    });
+
+    return readClientJson(response, scopeProfileSchema);
+}
+
+export async function createScopeProfile(payload: ScopeProfileCreate) {
+    const response = await fetch("/api/scope-profiles", {
+        method: "POST",
+        headers: jsonHeaders(),
+        body: JSON.stringify(payload),
+    });
+
+    return readClientJson(response, scopeProfileSchema);
+}
+
+export async function updateScopeProfile(profileId: string, payload: ScopeProfileUpdate) {
+    const response = await fetch(`/api/scope-profiles/${profileId}`, {
+        method: "PATCH",
+        headers: jsonHeaders(),
+        body: JSON.stringify(payload),
+    });
+
+    return readClientJson(response, scopeProfileSchema);
+}
+
+export async function deleteScopeProfile(profileId: string) {
+    return requestNoContent(`/api/scope-profiles/${profileId}`, {
+        method: "DELETE",
+    });
+}
+
+export async function activateScopeProfile(profileId: string) {
+    const response = await fetch(`/api/scope-profiles/${profileId}/activate`, {
+        method: "POST",
+    });
+
+    return readClientJson(response, activateProfileResponseSchema);
+}
+
+export async function recomputeScopeVector(profileId: string) {
+    const response = await fetch(`/api/scope-profiles/${profileId}/recompute-vector`, {
+        method: "POST",
+    });
+
+    return readClientJson(response, recomputeVectorResponseSchema);
+}
+
+export async function getScopeProfileDecisions(
+    profileId: string,
+    options: { decision?: string; limit?: number; offset?: number } = {},
+) {
+    const query = buildQueryString({
+        decision: options.decision,
+        limit: options.limit ?? 20,
+        offset: options.offset ?? 0,
+    });
+
+    const response = await fetch(`/api/scope-profiles/${profileId}/decisions?${query}`, {
+        cache: "no-store",
+    });
+
+    return readClientJson(response, filterDecisionListResponseSchema);
+}
+
+export async function getScopeProfileDecisionStats(profileId: string) {
+    const response = await fetch(`/api/scope-profiles/${profileId}/decisions/stats`, {
+        cache: "no-store",
+    });
+
+    return readClientJson(response, decisionStatsResponseSchema);
+}
+
 
 function jsonHeaders() {
     return {

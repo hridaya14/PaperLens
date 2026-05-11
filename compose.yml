@@ -104,7 +104,7 @@ services:
       # Environment variables for DAG tasks
       - POSTGRES_DATABASE_URL=${POSTGRES_DATABASE_URL}
       - OPENSEARCH_HOST=${OPENSEARCH_HOST}
-      - PYTHONPATH=/opt/airflow/src
+      - PYTHONPATH=/opt/airflow
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - airflow_logs:/opt/airflow/logs

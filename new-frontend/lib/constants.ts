@@ -30,4 +30,6 @@ export const NAV_ITEMS = [
   { href: "/papers", label: "Papers" },
   { href: "/uploads", label: "Uploads" },
   { href: "/chat", label: "Chat" },
+  { href: "/profile", label: "Profile" },
 ] as const;
+

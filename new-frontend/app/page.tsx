@@ -39,7 +39,7 @@ export default function HomePage() {
       <section className="container pt-14">
         <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
           <div className="panel-surface overflow-hidden p-8 md:p-10">
-            <div className="eyebrow mb-5">Prototype to product-grade frontend</div>
+            <div className="eyebrow mb-5">Your research, organised</div>
             <h1 className="max-w-4xl font-serif text-5xl font-semibold leading-[1.05] tracking-tight md:text-7xl">
               A research workspace for ingesting, exploring, and reasoning over academic papers.
             </h1>
@@ -61,9 +61,9 @@ export default function HomePage() {
 
           <div className="panel-dark grid min-h-[420px] content-between p-8">
             <div>
-              <Badge variant="dark">Why this version exists</Badge>
+              <Badge variant="dark">Built for deep research</Badge>
               <p className="mt-5 font-serif text-3xl font-semibold leading-tight text-white">
-                Preserve the proven Streamlit workflows, but give them better structure, motion, and room to grow.
+                Everything you need to ingest, explore, and reason over academic literature — in one deliberate environment.
               </p>
             </div>
             <div className="grid gap-4">

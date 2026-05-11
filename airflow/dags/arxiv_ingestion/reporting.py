@@ -19,23 +19,31 @@ def generate_daily_report(**context):
         logger.warning("No task instance available, generating basic report")
         return {"status": "basic_report", "message": "No task instance for XCom data"}
 
-    fetch_stats = ti.xcom_pull(task_ids="fetch_daily_papers", key="fetch_results") or {}
-    hybrid_stats = ti.xcom_pull(task_ids="index_papers_hybrid", key="hybrid_index_stats") or {}
+    fetch_stats   = ti.xcom_pull(task_ids="fetch_paper_metadata", key="papers_count") or 0
+    filter_stats  = ti.xcom_pull(task_ids="filter_papers",        key="filter_results") or {}
+    hybrid_stats  = ti.xcom_pull(task_ids="index_papers_hybrid",  key="hybrid_index_stats") or {}
 
     report = {
         "execution_date": context.get("execution_date", datetime.now()).isoformat(),
         "fetch_statistics": {
-            "papers_fetched": fetch_stats.get("papers_fetched", 0),
-            "papers_stored": fetch_stats.get("papers_stored", 0),
-            "target_date": fetch_stats.get("date", "unknown"),
+            "papers_fetched": fetch_stats,
+            "from_date": ti.xcom_pull(task_ids="fetch_paper_metadata", key="fetch_date") or "unknown",
+            "to_date":   ti.xcom_pull(task_ids="fetch_paper_metadata", key="to_date")   or "unknown",
+        },
+        "filter_statistics": {
+            "filtering_enabled": filter_stats.get("filtering_enabled", False),
+            "total_candidates":  filter_stats.get("total_candidates", 0),
+            "ingested_count":    filter_stats.get("ingested_count", 0),
+            "rejected_count":    filter_stats.get("rejected_count", 0),
+            "filter_details":    filter_stats.get("filter_stats", {}),
         },
         "indexing_statistics": {
-            "papers_processed": hybrid_stats.get("papers_processed", 0),
-            "chunks_created": hybrid_stats.get("total_chunks_created", 0),
-            "chunks_indexed": hybrid_stats.get("total_chunks_indexed", 0),
+            "papers_processed":     hybrid_stats.get("papers_processed", 0),
+            "chunks_created":       hybrid_stats.get("total_chunks_created", 0),
+            "chunks_indexed":       hybrid_stats.get("total_chunks_indexed", 0),
             "embeddings_generated": hybrid_stats.get("total_embeddings_generated", 0),
         },
-        "pipeline_status": "success" if fetch_stats and hybrid_stats else "partial",
+        "pipeline_status": "success" if filter_stats and hybrid_stats else "partial",
     }
 
     try:

@@ -287,3 +287,121 @@ export type StreamChunkEvent = {
   user_message_id?: string;
   assistant_message_id?: string;
 };
+
+// ---------------------------------------------------------------------------
+// Scope profile schemas
+// ---------------------------------------------------------------------------
+
+export const scoringWeightsSchema = z.object({
+  relevance: z.number().default(0.70),
+  venue: z.number().default(0.15),
+  citation: z.number().default(0.15),
+});
+
+export const filteringThresholdsSchema = z.object({
+  embedding_high: z.number().default(0.82),
+  embedding_low: z.number().default(0.60),
+  composite_ingest: z.number().default(0.72),
+});
+
+export const journalFilterConfigSchema = z.object({
+  enabled: z.boolean().default(false),
+  mode: z.enum(["boost", "require", "exclude"]).default("boost"),
+  venues: z.array(z.string()).default([]),
+  boost_factor: z.number().default(0.10),
+  fallback_on_unknown: z.boolean().default(true),
+});
+
+export const scopeProfileSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  description: z.string().nullable().optional(),
+  seed_paper_ids: z.array(z.string()).default([]),
+  required_terms: z.array(z.string()).default([]),
+  excluded_terms: z.array(z.string()).default([]),
+  lexical_match_mode: z.enum(["any", "all"]).default("any"),
+  scoring_weights: scoringWeightsSchema,
+  thresholds: filteringThresholdsSchema,
+  journal_filter: journalFilterConfigSchema,
+  is_active: z.boolean().default(false),
+  version_hash: z.string().nullable().optional(),
+  has_scope_vector: z.boolean().default(false),
+  created_at: dateValueSchema,
+  updated_at: dateValueSchema,
+});
+
+export const scopeProfileListResponseSchema = z.object({
+  profiles: z.array(scopeProfileSchema),
+  total: z.number(),
+  active_profile_id: z.string().uuid().nullable().optional(),
+});
+
+export const activateProfileResponseSchema = z.object({
+  profile_id: z.string().uuid(),
+  name: z.string(),
+  version_hash: z.string().nullable().optional(),
+  message: z.string(),
+});
+
+export const recomputeVectorResponseSchema = z.object({
+  profile_id: z.string().uuid(),
+  vector_dims: z.number(),
+  seed_papers_used: z.number(),
+  computed_at: dateValueSchema,
+  message: z.string(),
+});
+
+export const filterDecisionResponseSchema = z.object({
+  id: z.string().uuid(),
+  paper_id: z.string().uuid().nullable().optional(),
+  scope_profile_id: z.string().uuid().nullable().optional(),
+  decision: z.string(),
+  composite_score: z.number().nullable().optional(),
+  semantic_score: z.number().nullable().optional(),
+  lexical_score: z.number().nullable().optional(),
+  reasoning: z.string().nullable().optional(),
+  decided_at: dateValueSchema.nullable().optional(),
+});
+
+export const filterDecisionListResponseSchema = z.object({
+  profile_id: z.string().uuid(),
+  decisions: z.array(filterDecisionResponseSchema),
+  total: z.number(),
+  acceptance_rate: z.number().nullable().optional(),
+});
+
+export const decisionStatsResponseSchema = z.object({
+  profile_id: z.string().uuid(),
+  total: z.number().optional(),
+  ingested: z.number().optional(),
+  rejected: z.number().optional(),
+  pending: z.number().optional(),
+  acceptance_rate: z.number().nullable().optional(),
+  avg_composite_score: z.number().nullable().optional(),
+  avg_semantic_score: z.number().nullable().optional(),
+});
+
+export const scopeProfileCreateSchema = z.object({
+  name: z.string().trim().min(1).max(255),
+  description: z.string().trim().max(4000).nullable().optional(),
+  seed_paper_ids: z.array(z.string()).optional(),
+  required_terms: z.array(z.string()).optional(),
+  excluded_terms: z.array(z.string()).optional(),
+  lexical_match_mode: z.enum(["any", "all"]).optional(),
+  scoring_weights: scoringWeightsSchema.partial().optional(),
+  thresholds: filteringThresholdsSchema.partial().optional(),
+  journal_filter: journalFilterConfigSchema.partial().optional(),
+});
+
+export const scopeProfileUpdateSchema = scopeProfileCreateSchema.partial();
+
+export type ScopeProfile = z.infer<typeof scopeProfileSchema>;
+export type ScopeProfileListResponse = z.infer<typeof scopeProfileListResponseSchema>;
+export type ActivateProfileResponse = z.infer<typeof activateProfileResponseSchema>;
+export type RecomputeVectorResponse = z.infer<typeof recomputeVectorResponseSchema>;
+export type FilterDecisionResponse = z.infer<typeof filterDecisionResponseSchema>;
+export type FilterDecisionListResponse = z.infer<typeof filterDecisionListResponseSchema>;
+export type DecisionStatsResponse = z.infer<typeof decisionStatsResponseSchema>;
+export type ScopeProfileCreate = z.infer<typeof scopeProfileCreateSchema>;
+export type ScopeProfileUpdate = z.infer<typeof scopeProfileUpdateSchema>;
+

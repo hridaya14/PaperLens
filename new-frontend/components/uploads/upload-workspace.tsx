@@ -427,14 +427,13 @@ export function UploadWorkspace() {
   return (
     <section className="container py-10">
       <div className="mb-8 flex flex-col gap-4">
-        <div className="eyebrow">Upload validation</div>
+        <div className="eyebrow">Paper Upload</div>
         <h1 className="font-serif text-5xl font-semibold tracking-tight text-foreground">
-          Test the PDF upload pipeline.
+          Add papers to your library.
         </h1>
         <p className="max-w-3xl text-lg leading-8 text-muted-foreground">
-          Upload multiple PDFs, keep them queued, and watch each task progress.
-          This mirrors NotebookLM-style flows where you can keep adding sources
-          while earlier ones are still processing.
+          Upload PDF papers to index them in PaperLens. Each file is processed
+          and made available for search, reading, and AI-assisted research.
         </p>
       </div>
 
@@ -560,6 +559,20 @@ export function UploadWorkspace() {
                   }))
                 }
               />
+            </div>
+
+            <div className="rounded-2xl border border-amber-400/20 bg-amber-400/8 p-4 text-sm">
+              <div className="mb-1.5 flex items-center gap-2 font-semibold text-amber-200">
+                <AlertTriangle className="h-4 w-4" />
+                Upload responsibility
+              </div>
+              <p className="leading-6 text-amber-100/80">
+                By uploading a file you confirm that you are the rightful owner or licensee of
+                the content, or that you have the necessary rights and permissions to upload and
+                process it. You upload at your own discretion and take full responsibility for
+                ensuring the paper does not infringe any third-party copyright or other
+                intellectual property rights.
+              </p>
             </div>
 
             <div className="flex flex-wrap gap-3">

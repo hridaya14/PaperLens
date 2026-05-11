@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, SearchSlash } from "lucide-react";
+import { Menu } from "lucide-react";
 import { useState } from "react";
 import { APP_TAGLINE, APP_TITLE, NAV_ITEMS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
@@ -91,11 +91,7 @@ export function SiteHeader() {
               })}
             </div>
             <div className="mt-4 rounded-2xl border border-dashed border-white/10 bg-white/5 p-4 text-sm text-muted-foreground">
-              <div className="mb-2 flex items-center gap-2 font-medium text-white">
-                <SearchSlash className="h-4 w-4" />
-                API-backed workspace
-              </div>
-              The Next.js frontend talks to FastAPI through same-origin proxy routes, so no browser CORS setup is needed.
+              Use the links above to navigate between your library, upload workspace, and AI research assistant.
             </div>
           </DialogContent>
         </Dialog>

@@ -51,16 +51,18 @@ def index_papers_hybrid(**context):
         ti = context.get("ti")
 
         fetch_results = None
+        filter_results = None
         if ti:
-            fetch_results = ti.xcom_pull(task_ids="fetch_daily_papers", key="fetch_results")
+            filter_results = ti.xcom_pull(task_ids="filter_papers", key="filter_results")
 
         with database.get_session() as session:
             from src.models.paper import Paper
 
-            if fetch_results and fetch_results.get("papers_stored", 0) > 0:
+            ingested_count = (filter_results or {}).get("ingested_count", 0)
+            if ingested_count > 0:
                 from sqlalchemy import desc
 
-                papers = session.query(Paper).order_by(desc(Paper.created_at)).limit(fetch_results["papers_stored"]).all()
+                papers = session.query(Paper).order_by(desc(Paper.created_at)).limit(ingested_count).all()
             else:
                 cutoff_date = datetime.now(timezone.utc) - timedelta(days=1)
                 papers = session.query(Paper).filter(Paper.created_at >= cutoff_date).all()

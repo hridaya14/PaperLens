@@ -15,3 +15,6 @@ psycopg2-binary>=2.9.0
 
 # OpenAI Client
 openai
+
+# Observability / tracing
+langfuse

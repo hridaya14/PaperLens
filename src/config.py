@@ -103,6 +103,80 @@ class OpenSearchSettings(BaseConfigSettings):
     hybrid_search_size_multiplier: int = 2
 
 
+class FilteringSettings(BaseConfigSettings):
+    """Settings for the personalized paper ingestion filtering pipeline."""
+
+    model_config = SettingsConfigDict(
+        env_file=[".env", str(ENV_FILE_PATH)],
+        env_prefix="FILTERING__",
+        extra="ignore",
+        frozen=True,
+        case_sensitive=False,
+    )
+
+    # Master switch — set False to bypass all filtering and ingest everything
+    enabled: bool = True
+
+    # -------------------------------------------------------------------------
+    # Layer 1 — Lexical pre-filter
+    # -------------------------------------------------------------------------
+    # "any": at least one required_term must appear in title+abstract
+    # "all": every required_term must appear
+    lexical_match_mode: Literal["any", "all"] = "any"
+
+    # -------------------------------------------------------------------------
+    # Layer 2 — Embedding similarity
+    # -------------------------------------------------------------------------
+    # Papers above high_threshold skip the LLM reranker (fast-track ingest)
+    embedding_high_threshold: float = 0.82
+    # Papers below low_threshold are rejected without LLM call (fast-track reject)
+    embedding_low_threshold: float = 0.60
+
+    # -------------------------------------------------------------------------
+    # Layer 3 — LLM reranker (ambiguous zone only)
+    # -------------------------------------------------------------------------
+    llm_reranking_enabled: bool = True
+    # Max papers to send to LLM reranker per pipeline run (cost guard)
+    llm_rerank_max_papers: int = 50
+
+    # -------------------------------------------------------------------------
+    # Semantic Scholar enrichment
+    # -------------------------------------------------------------------------
+    # Disabled until API key is available
+    semantic_scholar_enabled: bool = False
+    semantic_scholar_api_key: str = ""
+    semantic_scholar_base_url: str = "https://api.semanticscholar.org/graph/v1"
+    # Rate limit: 100 requests per 5 minutes on free tier
+    semantic_scholar_requests_per_minute: int = 18
+
+    # -------------------------------------------------------------------------
+    # Composite score weights (must sum to 1.0)
+    # -------------------------------------------------------------------------
+    weight_relevance: float = 0.70
+    weight_venue: float = 0.15
+    weight_citation: float = 0.15
+
+    # Final gate: papers below this composite score are rejected
+    composite_ingest_threshold: float = 0.72
+
+    # -------------------------------------------------------------------------
+    # Citation scoring
+    # -------------------------------------------------------------------------
+    # Papers newer than this many days skip citation scoring (not enough time
+    # to accumulate citations — rely on relevance score only)
+    citation_min_paper_age_days: int = 14
+    # Hard floor — papers with fewer influential citations than this are
+    # penalised regardless of other signals (0 = disabled)
+    min_influential_citations: int = 0
+
+    @field_validator("weight_relevance", "weight_venue", "weight_citation")
+    @classmethod
+    def validate_weights(cls, v: float) -> float:
+        if not 0.0 <= v <= 1.0:
+            raise ValueError("Scoring weights must be between 0.0 and 1.0")
+        return v
+
+
 class Settings(BaseConfigSettings):
     """Application settings."""
 
@@ -153,6 +227,9 @@ class Settings(BaseConfigSettings):
 
     # Chunking settings
     chunking: ChunkingSettings = Field(default_factory=ChunkingSettings)
+
+    # Filtering Settings
+    filtering: FilteringSettings = Field(default_factory=FilteringSettings)
 
     @field_validator("postgres_database_url")
     @classmethod
